@@ -44,7 +44,7 @@ public class CacheInvalidationController extends MetadataAbstractController<Addr
     })
     public ResponseEntity<?> post(
     ) {
-        EposDataModelDAO.clearAllCaches();
+        EposDataModelDAO.getInstance().clearAllCaches();
         return new ResponseEntity<>(HttpStatus.OK);
     }
 }

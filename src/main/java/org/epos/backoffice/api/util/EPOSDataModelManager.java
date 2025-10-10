@@ -75,7 +75,7 @@ public class EPOSDataModelManager {
 
     public static ApiResponseMessage createEposDataModelEntity(EPOSDataModelEntity obj, User user, EntityNames entityNames, Class clazz) {
 
-        EposDataModelDAO.clearAllCaches();
+        EposDataModelDAO.getInstance().clearAllCaches();
 
         /** CHECK PERMISSIONS **/
         Boolean isAccessibleByUser = false;
@@ -126,7 +126,7 @@ public class EPOSDataModelManager {
 
     public static ApiResponseMessage updateEposDataModelEntity(EPOSDataModelEntity obj, User user, EntityNames entityNames, Class clazz) {
 
-        EposDataModelDAO.clearAllCaches();
+        EposDataModelDAO.getInstance().clearAllCaches();
 
         /** CHECK PERMISSIONS **/
         Boolean isAccessibleByUser = false;
@@ -192,7 +192,7 @@ public class EPOSDataModelManager {
     }
 
     public static boolean deleteEposDataModelEntity(String instance_id, User user, EntityNames entityNames, Class clazz) {
-        EposDataModelDAO.clearAllCaches();
+        EposDataModelDAO.getInstance().clearAllCaches();
 
         AbstractAPI dbapi = AbstractAPI.retrieveAPI(entityNames.name());
 

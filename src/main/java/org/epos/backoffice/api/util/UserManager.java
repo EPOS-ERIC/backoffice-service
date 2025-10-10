@@ -45,7 +45,7 @@ public class UserManager {
 	 * @return
 	 */
 	public static ApiResponseMessage createUser(User inputUser, User user) {
-		EposDataModelDAO.clearAllCaches();
+		EposDataModelDAO.getInstance().clearAllCaches();
 
 		if(!user.getIsAdmin()) return new ApiResponseMessage(ApiResponseMessage.ERROR, "You can't register other user");
 
@@ -63,7 +63,7 @@ public class UserManager {
 	}
 
 	public static ApiResponseMessage addUserToGroup(AddUserToGroupBean userGroup, User user) {
-		EposDataModelDAO.clearAllCaches();
+		EposDataModelDAO.getInstance().clearAllCaches();
 
 		if(!user.getIsAdmin()) return new ApiResponseMessage(ApiResponseMessage.ERROR, "You can't add users to groups");
 
@@ -81,7 +81,7 @@ public class UserManager {
 
 
 	public static ApiResponseMessage removeUserFromGroup(RemoveUserFromGroupBean removeUserFromGroupBean, User user) {
-		EposDataModelDAO.clearAllCaches();
+		EposDataModelDAO.getInstance().clearAllCaches();
 
 		if(!user.getIsAdmin()) return new ApiResponseMessage(ApiResponseMessage.ERROR, "You can't remove users from groups");
 
@@ -103,7 +103,7 @@ public class UserManager {
 	 */
 	public static ApiResponseMessage updateUser(User inputUser, User user) {
 
-		EposDataModelDAO.clearAllCaches();
+		EposDataModelDAO.getInstance().clearAllCaches();
 		if(!user.getIsAdmin()) return new ApiResponseMessage(ApiResponseMessage.ERROR, "You can't update users");
 
 		inputUser.setFirstName(inputUser.getFirstName() == null ? user.getFirstName() : inputUser.getFirstName());
@@ -121,7 +121,7 @@ public class UserManager {
 	}
 
 	public static ApiResponseMessage deleteUser(String instance_id, User user) {
-		EposDataModelDAO.clearAllCaches();
+		EposDataModelDAO.getInstance().clearAllCaches();
 
 		if(!user.getIsAdmin()) return new ApiResponseMessage(ApiResponseMessage.ERROR, "You can't delete users");
 

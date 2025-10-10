@@ -1,62 +1,16 @@
-2025-06-12 10:07:08 [main] INFO  o.testcontainers.images.PullPolicy - Image pull policy will be performed by: DefaultPullPolicy()
-2025-06-12 10:07:08 [main] INFO  o.t.utility.ImageNameSubstitutor - Image name substitution will be performed by: DefaultImageNameSubstitutor (composite of 'ConfigurationFileImageNameSubstitutor' and 'PrefixingImageNameSubstitutor')
-2025-06-12 10:07:08 [main] INFO  o.testcontainers.DockerClientFactory - Testcontainers version: 1.21.0
-2025-06-12 10:07:08 [main] INFO  o.t.d.DockerClientProviderStrategy - Loaded org.testcontainers.dockerclient.UnixSocketClientProviderStrategy from ~/.testcontainers.properties, will try it first
-2025-06-12 10:07:08 [main] INFO  o.t.d.DockerClientProviderStrategy - Found Docker environment with local Unix socket (unix:///var/run/docker.sock)
-2025-06-12 10:07:08 [main] INFO  o.testcontainers.DockerClientFactory - Docker host IP address is localhost
-2025-06-12 10:07:08 [main] INFO  o.testcontainers.DockerClientFactory - Connected to docker: 
-  Server Version: 28.2.2
-  API Version: 1.50
+2025-10-10 15:33:46 [main] INFO  o.testcontainers.images.PullPolicy - Image pull policy will be performed by: DefaultPullPolicy()
+2025-10-10 15:33:46 [main] INFO  o.t.utility.ImageNameSubstitutor - Image name substitution will be performed by: DefaultImageNameSubstitutor (composite of 'ConfigurationFileImageNameSubstitutor' and 'PrefixingImageNameSubstitutor')
+2025-10-10 15:33:46 [main] INFO  o.testcontainers.DockerClientFactory - Testcontainers version: 1.21.0
+2025-10-10 15:33:47 [main] INFO  o.t.d.DockerClientProviderStrategy - Loaded org.testcontainers.dockerclient.UnixSocketClientProviderStrategy from ~/.testcontainers.properties, will try it first
+2025-10-10 15:33:47 [main] INFO  o.t.d.DockerClientProviderStrategy - Found Docker environment with local Unix socket (unix:///var/run/docker.sock)
+2025-10-10 15:33:47 [main] INFO  o.testcontainers.DockerClientFactory - Docker host IP address is localhost
+2025-10-10 15:33:47 [main] INFO  o.testcontainers.DockerClientFactory - Connected to docker: 
+  Server Version: 28.5.1
+  API Version: 1.51
   Operating System: EndeavourOS
-  Total Memory: 63744 MB
-2025-06-12 10:07:08 [main] INFO  tc.testcontainers/ryuk:0.11.0 - Creating container for image: testcontainers/ryuk:0.11.0
-2025-06-12 10:07:08 [main] INFO  tc.testcontainers/ryuk:0.11.0 - Container testcontainers/ryuk:0.11.0 is starting: d1161232334b7ce0e86bd27f6ad3d1d0b8b807196c2444de151bc0664d567fdf
-2025-06-12 10:07:08 [main] INFO  tc.testcontainers/ryuk:0.11.0 - Container testcontainers/ryuk:0.11.0 started in PT0.221065746S
-2025-06-12 10:07:08 [main] INFO  o.t.utility.RyukResourceReaper - Ryuk started - will monitor and terminate Testcontainers containers on JVM exit
-2025-06-12 10:07:08 [main] INFO  o.testcontainers.DockerClientFactory - Checking the system...
-2025-06-12 10:07:08 [main] INFO  o.testcontainers.DockerClientFactory - ✔︎ Docker server version should be at least 1.6.0
-2025-06-12 10:07:08 [main] INFO  t.epos/metadata-database-deploy-test:latest - Creating container for image: epos/metadata-database-deploy-test:latest
-2025-06-12 10:07:08 [main] INFO  t.epos/metadata-database-deploy-test:latest - Container epos/metadata-database-deploy-test:latest is starting: edb1af8e6ced5e2fb94230d7468f0a6193b515f1dd02c89aabf1d318cb7e1625
-2025-06-12 10:07:12 [main] INFO  t.epos/metadata-database-deploy-test:latest - Container epos/metadata-database-deploy-test:latest started in PT3.708857067S
-2025-06-12 10:07:12 [main] INFO  t.epos/metadata-database-deploy-test:latest - Container is started (JDBC URL: jdbc:postgresql://localhost:32789/metadata_catalogue?loggerLevel=OFF)
-2025-06-12 10:07:12 [main] INFO  com.zaxxer.hikari.HikariDataSource - metadata_catalogue - Starting...
-2025-06-12 10:07:12 [main] INFO  com.zaxxer.hikari.pool.HikariPool - metadata_catalogue - Added connection org.postgresql.jdbc.PgConnection@4047d2d9
-2025-06-12 10:07:12 [main] INFO  com.zaxxer.hikari.HikariDataSource - metadata_catalogue - Start completed.
-2025-06-12 10:07:13 [main] INFO  o.h.validator.internal.util.Version - HV000001: Hibernate Validator 8.0.2.Final
-2025-06-12 10:07:13 [main] INFO  com.zaxxer.hikari.HikariDataSource - metadata_catalogue - Starting...
-2025-06-12 10:07:13 [main] INFO  com.zaxxer.hikari.pool.HikariPool - metadata_catalogue - Added connection org.postgresql.jdbc.PgConnection@42211e04
-2025-06-12 10:07:13 [main] INFO  com.zaxxer.hikari.HikariDataSource - metadata_catalogue - Start completed.
-2025-06-12 10:07:13 [main] INFO  com.zaxxer.hikari.HikariDataSource - metadata_catalogue - Starting...
-2025-06-12 10:07:14 [main] INFO  com.zaxxer.hikari.pool.HikariPool - metadata_catalogue - Added connection org.postgresql.jdbc.PgConnection@6ceb11f9
-2025-06-12 10:07:14 [main] INFO  com.zaxxer.hikari.HikariDataSource - metadata_catalogue - Start completed.
-2025-06-12 10:07:14 [main] INFO  com.zaxxer.hikari.HikariDataSource - metadata_catalogue - Starting...
-2025-06-12 10:07:14 [main] INFO  com.zaxxer.hikari.pool.HikariPool - metadata_catalogue - Added connection org.postgresql.jdbc.PgConnection@81a8898
-2025-06-12 10:07:14 [main] INFO  com.zaxxer.hikari.HikariDataSource - metadata_catalogue - Start completed.
-2025-06-12 10:07:38 [main] INFO  o.testcontainers.images.PullPolicy - Image pull policy will be performed by: DefaultPullPolicy()
-2025-06-12 10:07:38 [main] INFO  o.t.utility.ImageNameSubstitutor - Image name substitution will be performed by: DefaultImageNameSubstitutor (composite of 'ConfigurationFileImageNameSubstitutor' and 'PrefixingImageNameSubstitutor')
-2025-06-12 10:07:38 [main] INFO  o.testcontainers.DockerClientFactory - Testcontainers version: 1.21.0
-2025-06-12 10:07:38 [main] INFO  o.t.d.DockerClientProviderStrategy - Loaded org.testcontainers.dockerclient.UnixSocketClientProviderStrategy from ~/.testcontainers.properties, will try it first
-2025-06-12 10:07:38 [main] INFO  o.t.d.DockerClientProviderStrategy - Found Docker environment with local Unix socket (unix:///var/run/docker.sock)
-2025-06-12 10:07:38 [main] INFO  o.testcontainers.DockerClientFactory - Docker host IP address is localhost
-2025-06-12 10:07:38 [main] INFO  o.testcontainers.DockerClientFactory - Connected to docker: 
-  Server Version: 28.2.2
-  API Version: 1.50
-  Operating System: EndeavourOS
-  Total Memory: 63744 MB
-2025-06-12 10:07:38 [main] INFO  tc.testcontainers/ryuk:0.11.0 - Creating container for image: testcontainers/ryuk:0.11.0
-2025-06-12 10:07:38 [main] INFO  tc.testcontainers/ryuk:0.11.0 - Container testcontainers/ryuk:0.11.0 is starting: 13a8081f4919b292d67a0ebb82fc9f4e600376972c4e71d919fc086d845b3f3d
-2025-06-12 10:07:38 [main] INFO  tc.testcontainers/ryuk:0.11.0 - Container testcontainers/ryuk:0.11.0 started in PT0.231442881S
-2025-06-12 10:07:38 [main] INFO  o.t.utility.RyukResourceReaper - Ryuk started - will monitor and terminate Testcontainers containers on JVM exit
-2025-06-12 10:07:38 [main] INFO  o.testcontainers.DockerClientFactory - Checking the system...
-2025-06-12 10:07:38 [main] INFO  o.testcontainers.DockerClientFactory - ✔︎ Docker server version should be at least 1.6.0
-2025-06-12 10:07:38 [main] INFO  t.epos/metadata-database-deploy-test:latest - Creating container for image: epos/metadata-database-deploy-test:latest
-2025-06-12 10:07:38 [main] INFO  t.epos/metadata-database-deploy-test:latest - Container epos/metadata-database-deploy-test:latest is starting: 96c2712f5871033514c6ab6886b9dc61605cffec621ff34c868d8f720632c5d5
-2025-06-12 10:07:42 [main] INFO  t.epos/metadata-database-deploy-test:latest - Container epos/metadata-database-deploy-test:latest started in PT3.705445211S
-2025-06-12 10:07:42 [main] INFO  t.epos/metadata-database-deploy-test:latest - Container is started (JDBC URL: jdbc:postgresql://localhost:32791/metadata_catalogue?loggerLevel=OFF)
-2025-06-12 10:07:42 [main] INFO  com.zaxxer.hikari.HikariDataSource - metadata_catalogue - Starting...
-2025-06-12 10:07:42 [main] INFO  com.zaxxer.hikari.pool.HikariPool - metadata_catalogue - Added connection org.postgresql.jdbc.PgConnection@2af69643
-2025-06-12 10:07:42 [main] INFO  com.zaxxer.hikari.HikariDataSource - metadata_catalogue - Start completed.
-2025-06-12 10:07:43 [main] INFO  o.h.validator.internal.util.Version - HV000001: Hibernate Validator 8.0.2.Final
-2025-06-12 10:07:43 [main] INFO  com.zaxxer.hikari.HikariDataSource - metadata_catalogue - Starting...
-2025-06-12 10:07:43 [main] INFO  com.zaxxer.hikari.pool.HikariPool - metadata_catalogue - Added connection org.postgresql.jdbc.PgConnection@ba562e0
-2025-06-12 10:07:43 [main] INFO  com.zaxxer.hikari.HikariDataSource - metadata_catalogue - Start completed.
+  Total Memory: 63743 MB
+2025-10-10 15:33:47 [main] INFO  tc.testcontainers/ryuk:0.11.0 - Creating container for image: testcontainers/ryuk:0.11.0
+2025-10-10 15:33:47 [main] INFO  tc.testcontainers/ryuk:0.11.0 - Container testcontainers/ryuk:0.11.0 is starting: 252c377ed7a57f5b28963a4367b5cf10d37a853193f8b60445cdedf0911ab0f7
+2025-10-10 15:33:56 [main] INFO  o.testcontainers.images.PullPolicy - Image pull policy will be performed by: DefaultPullPolicy()
+2025-10-10 15:33:56 [main] INFO  o.t.utility.ImageNameSubstitutor - Image name substitution will be performed by: DefaultImageNameSubstitutor (composite of 'ConfigurationFileImageNameSubstitutor' and 'PrefixingImageNameSubstitutor')
+2025-10-10 15:33:56 [main] INFO  o.testcontainers.DockerClientFactory - Testcontainers version: 1.21.0
