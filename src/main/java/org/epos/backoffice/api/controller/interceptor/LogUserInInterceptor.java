@@ -27,9 +27,9 @@ public class LogUserInInterceptor implements HandlerInterceptor {
 
 
         /** TODO: DELETE **/
-        if (!allRequestParams.containsKey("userId")) {
+        /*if (!allRequestParams.containsKey("userId")) {
             allRequestParams.put("userId", "admin");
-        }
+        }*/
 
 
         System.out.println(allRequestParams);
@@ -52,7 +52,7 @@ public class LogUserInInterceptor implements HandlerInterceptor {
             user.setEmail(allRequestParams.get("email"));
             user.setFirstName(allRequestParams.get("firstName"));
             user.setLastName(allRequestParams.get("lastName"));
-            user.setIsAdmin(true); //SWITCH when possible to false
+            user.setIsAdmin(false); //SWITCH when possible to false
             if(UserGroupManagementAPI.createUser(user)){
                 user = UserGroupManagementAPI.retrieveUserById(allRequestParams.get("userId"));
             } else {
