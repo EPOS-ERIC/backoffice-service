@@ -117,6 +117,7 @@ public class UserController extends ManagementAbstractController<User> implement
 		System.out.println("Session User: "+user.toString());
 		
 		ApiResponseMessage response = UserManager.getUser(instance_id, user, available_section);
+        System.out.println("Session User: "+response);
 		if(response.getCode()==6) return ResponseEntity.status(403).body(response);
 		if(response.getCode()!=4) return ResponseEntity.status(400).body(response);
 
