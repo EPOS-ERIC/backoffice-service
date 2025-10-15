@@ -44,7 +44,7 @@ public class LogUserInInterceptor implements HandlerInterceptor {
 
         User user = UserGroupManagementAPI.retrieveUserById(allRequestParams.get("userId"));
 
-        System.out.println(user);
+        System.out.println("RETRIEVED USER: "+user);
 
         if(user == null){
             user = new User();
@@ -55,6 +55,7 @@ public class LogUserInInterceptor implements HandlerInterceptor {
             user.setIsAdmin(false); //SWITCH when possible to false
             if(UserGroupManagementAPI.createUser(user)){
                 user = UserGroupManagementAPI.retrieveUserById(allRequestParams.get("userId"));
+                System.out.println("CREATED USER: "+user);
             } else {
                 String message = "{\"message\": \"The user doesn't exists\"}";
                 response.setContentType("application/json");
@@ -65,6 +66,7 @@ public class LogUserInInterceptor implements HandlerInterceptor {
 
 
         }
+        System.out.println("FINAL USER: "+user);
 
         HttpSession session = request.getSession();
         session.setAttribute("user", user);
