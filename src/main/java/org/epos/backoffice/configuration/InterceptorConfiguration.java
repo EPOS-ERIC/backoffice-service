@@ -32,7 +32,8 @@ public class InterceptorConfiguration implements WebMvcConfigurer {
                         "/parameter/**",
                         "/periodoftime/**",
                         "/person/**",
-                        "/webservice/**"
+                        "/webservice/**",
+                        "/populate-ttl/**"
                 )
         );
     }
