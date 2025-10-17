@@ -1,17 +1,22 @@
 package org.epos.backoffice.api.util;
 
-import abstractapis.AbstractAPI;
-import dao.EposDataModelDAO;
-import metadataapis.*;
-import model.*;
-import org.epos.eposdatamodel.*;
-import org.epos.eposdatamodel.User;
-import usermanagementapis.UserGroupManagementAPI;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
+
+import org.epos.eposdatamodel.EPOSDataModelEntity;
+import org.epos.eposdatamodel.Group;
+import org.epos.eposdatamodel.LinkedEntity;
+import org.epos.eposdatamodel.User;
+import org.epos.eposdatamodel.UserGroup;
+
+import abstractapis.AbstractAPI;
+import dao.EposDataModelDAO;
+import metadataapis.EntityNames;
+import model.RoleType;
+import model.StatusType;
+import usermanagementapis.UserGroupManagementAPI;
 
 public class EPOSDataModelManager {
 
