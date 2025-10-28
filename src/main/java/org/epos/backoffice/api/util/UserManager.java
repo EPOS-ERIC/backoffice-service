@@ -7,6 +7,7 @@ import java.util.stream.Collectors;
 import dao.EposDataModelDAO;
 import model.RequestStatusType;
 import model.RoleType;
+import model.StatusType;
 import org.epos.eposdatamodel.User;
 import usermanagementapis.UserGroupManagementAPI;
 
@@ -70,7 +71,7 @@ public class UserManager {
 	public static ApiResponseMessage addUserToGroup(AddUserToGroupBean userGroup, User user) {
 		EposDataModelDAO.getInstance().clearAllCaches();
 
-		if(!user.getIsAdmin()) return new ApiResponseMessage(ApiResponseMessage.ERROR, "You can't add users to groups");
+		if(!user.getIsAdmin() && userGroup.getStatusType().equals("ACCEPTED")) return new ApiResponseMessage(ApiResponseMessage.ERROR, "You can't add users to groups");
 
 		Boolean result = UserGroupManagementAPI.addUserToGroup(
 				userGroup.getGroupid(),
