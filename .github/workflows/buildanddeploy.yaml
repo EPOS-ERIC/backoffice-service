@@ -66,12 +66,24 @@ jobs:
         with:
           java-version: '21'
           distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Cache Dependency Check Data
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2/repository/org/owasp/dependency-check-data
+          key: dep-check-data-${{ runner.os }}-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            dep-check-data-${{ runner.os }}-
 
       - name: Run Dependency Check via Maven
+        env:
+          NVD_KEY: ${{ secrets.NVD_API_KEY }}
         run: |
           mvn org.owasp:dependency-check-maven:check \
           -Dformat=SARIF \
-          -DfailBuildOnCVSS=7
+          -DfailBuildOnCVSS=7 \
+          -DnvdApiKey=$NVD_KEY
 
       - name: Upload Dependency-Check results
         uses: github/codeql-action/upload-sarif@v4
