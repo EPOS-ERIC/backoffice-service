@@ -67,28 +67,22 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      - name: Build with Maven
-        run: mvn clean package -DskipTests
+      # Non serve fare "package" prima, il goal dependency-check lo gestisce o usa i file risolti
+      # Ma per sicurezza usiamo verify o install se necessario, oppure lanciamo direttamente il goal:
 
-      - name: Run Dependency-Check
-        uses: dependency-check/Dependency-Check_Action@main
-        id: depcheck
-        env:
-          JAVA_HOME: /opt/jdk  # Reset to match the Docker image
-        with:
-          project: ${{ github.event.repository.name }}
-          path: '.'
-          format: 'SARIF'
-          out: 'reports'
-          args: >
-            --failOnCVSS 7
-            --enableRetired
+      - name: Run Dependency Check via Maven
+        run: |
+          mvn org.owasp:dependency-check-maven:check \
+          -Dformat=SARIF \
+          -DfailBuildOnCVSS=7
+        # Nota: Questo scaricherà il database delle vulnerabilità, che richiede tempo.
 
       - name: Upload Dependency-Check results
         uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
-          sarif_file: reports/
+          # Il plugin Maven di solito mette il report in target/dependency-check-report.sarif
+          sarif_file: target/dependency-check-report.sarif
 
   build:
     runs-on: ubuntu-latest
