@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping(
-        value = "/softwareSourceCode",
+        value = "/softwaresourcecode",
         produces = {"SourceCode/json"}
 )
 public class SoftwareSourceCodeController extends MetadataAbstractController<SoftwareSourceCode> implements ApiDocTag {
