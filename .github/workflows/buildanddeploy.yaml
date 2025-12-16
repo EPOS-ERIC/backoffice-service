@@ -85,7 +85,6 @@ jobs:
             --failOnCVSS 7
             --enableRetired
             --nvdApiKey ${{ secrets.NVD_API_KEY }}
-            --centralAnalyzerSearchTimeout 240000
 
       - name: Upload Dependency-Check results
         uses: github/codeql-action/upload-sarif@v4
