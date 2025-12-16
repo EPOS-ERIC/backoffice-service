@@ -66,30 +66,32 @@ jobs:
         with:
           java-version: '21'
           distribution: 'temurin'
-          cache: 'maven'
 
-      - name: Cache Dependency Check Data
-        uses: actions/cache@v3
-        with:
-          path: ~/.m2/repository/org/owasp/dependency-check-data
-          key: dep-check-data-${{ runner.os }}-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            dep-check-data-${{ runner.os }}-
+      - name: Build with Maven
+        run: mvn clean package -DskipTests
 
-      - name: Run Dependency Check via Maven
+      - name: Run Dependency-Check
+        uses: dependency-check/Dependency-Check_Action@main
+        id: depcheck
         env:
-          NVD_KEY: ${{ secrets.NVD_API_KEY }}
-        run: |
-          mvn org.owasp:dependency-check-maven:check \
-          -Dformat=SARIF \
-          -DfailBuildOnCVSS=7 \
-          -DnvdApiKey=$NVD_KEY
+          JAVA_HOME: /opt/jdk
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        with:
+          project: ${{ github.event.repository.name }}
+          path: '.'
+          format: 'SARIF'
+          out: 'reports'
+          args: >
+            --failOnCVSS 7
+            --enableRetired
+            --nvdApiKey ${{ secrets.NVD_API_KEY }}
+            --centralAnalyzerSearchTimeout 240000
 
       - name: Upload Dependency-Check results
         uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
-          sarif_file: target/dependency-check-report.sarif
+          sarif_file: reports/
 
   build:
     runs-on: ubuntu-latest
