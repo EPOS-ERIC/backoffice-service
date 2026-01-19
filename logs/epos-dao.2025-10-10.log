@@ -1,0 +1,16 @@
+2025-10-10 15:33:46 [main] INFO  o.testcontainers.images.PullPolicy - Image pull policy will be performed by: DefaultPullPolicy()
+2025-10-10 15:33:46 [main] INFO  o.t.utility.ImageNameSubstitutor - Image name substitution will be performed by: DefaultImageNameSubstitutor (composite of 'ConfigurationFileImageNameSubstitutor' and 'PrefixingImageNameSubstitutor')
+2025-10-10 15:33:46 [main] INFO  o.testcontainers.DockerClientFactory - Testcontainers version: 1.21.0
+2025-10-10 15:33:47 [main] INFO  o.t.d.DockerClientProviderStrategy - Loaded org.testcontainers.dockerclient.UnixSocketClientProviderStrategy from ~/.testcontainers.properties, will try it first
+2025-10-10 15:33:47 [main] INFO  o.t.d.DockerClientProviderStrategy - Found Docker environment with local Unix socket (unix:///var/run/docker.sock)
+2025-10-10 15:33:47 [main] INFO  o.testcontainers.DockerClientFactory - Docker host IP address is localhost
+2025-10-10 15:33:47 [main] INFO  o.testcontainers.DockerClientFactory - Connected to docker: 
+  Server Version: 28.5.1
+  API Version: 1.51
+  Operating System: EndeavourOS
+  Total Memory: 63743 MB
+2025-10-10 15:33:47 [main] INFO  tc.testcontainers/ryuk:0.11.0 - Creating container for image: testcontainers/ryuk:0.11.0
+2025-10-10 15:33:47 [main] INFO  tc.testcontainers/ryuk:0.11.0 - Container testcontainers/ryuk:0.11.0 is starting: 252c377ed7a57f5b28963a4367b5cf10d37a853193f8b60445cdedf0911ab0f7
+2025-10-10 15:33:56 [main] INFO  o.testcontainers.images.PullPolicy - Image pull policy will be performed by: DefaultPullPolicy()
+2025-10-10 15:33:56 [main] INFO  o.t.utility.ImageNameSubstitutor - Image name substitution will be performed by: DefaultImageNameSubstitutor (composite of 'ConfigurationFileImageNameSubstitutor' and 'PrefixingImageNameSubstitutor')
+2025-10-10 15:33:56 [main] INFO  o.testcontainers.DockerClientFactory - Testcontainers version: 1.21.0
