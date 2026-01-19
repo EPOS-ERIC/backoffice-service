@@ -3,6 +3,7 @@ package org.epos.backoffice.api.controller;
 import java.net.URI;
 import java.util.Optional;
 
+import dao.EposDataModelDAO;
 import org.epos.backoffice.api.util.ApiResponseMessage;
 import org.epos.backoffice.model.StatusType;
 import org.epos.eposdatamodel.User;
@@ -116,7 +117,9 @@ public class PopulateTTLController implements ApiDocTag {
 		HttpEntity<String> requestEntity = new HttpEntity<>(body != null ? body : "", forwardedHeaders);
 
 		try {
-			return restTemplate.exchange(uri, HttpMethod.POST, requestEntity, String.class);
+			ResponseEntity<String> result = restTemplate.exchange(uri, HttpMethod.POST, requestEntity, String.class);
+			EposDataModelDAO.getInstance().clearAllCaches();
+			return result;
 		} catch (Exception e) {
 			e.printStackTrace();
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
