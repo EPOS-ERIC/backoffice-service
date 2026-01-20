@@ -8,6 +8,8 @@ import org.epos.backoffice.api.util.ApiResponseMessage;
 import org.epos.backoffice.model.StatusType;
 import org.epos.eposdatamodel.User;
 import org.epos.eposdatamodel.UserGroup;
+import org.slf4j.LoggerFactory;
+import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -38,6 +40,9 @@ import model.RoleType;
 @io.swagger.v3.oas.annotations.tags.Tag(name = "Backoffice Service - Metadata APIs")
 public class PopulateTTLController implements ApiDocTag {
 
+    private static final Logger log = LoggerFactory.getLogger(PopulateTTLController.class);
+
+
 	private final RestTemplate restTemplate;
 	private final HttpServletRequest request;
 	private static final String INGESTOR_SERVICE_BASE_URL = "http://ingestor-service:8080/api/ingestor-service/v1/";
@@ -46,6 +51,7 @@ public class PopulateTTLController implements ApiDocTag {
 	public PopulateTTLController(RestTemplate restTemplate, HttpServletRequest request) {
 		this.restTemplate = restTemplate;
 		this.request = request;
+		log.info("PopulateTTLController initialized");
 	}
 
 	@PostMapping
@@ -72,6 +78,7 @@ public class PopulateTTLController implements ApiDocTag {
 
 		User user = (User) request.getSession().getAttribute("user");
 		if (user == null) {
+			log.warn("User not found in session for populateTTL request");
 			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized: User not found in session.");
 		}
 
@@ -91,6 +98,7 @@ public class PopulateTTLController implements ApiDocTag {
 		}
 
 		if (!isAuthorized) {
+			log.warn("User {} not authorized for metadataGroup: {}", user.getAuthIdentifier(), metadataGroup);
 			return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
 					.body("Unauthorized: User does not have sufficient permissions for this metadata group.");
 		}
@@ -99,7 +107,8 @@ public class PopulateTTLController implements ApiDocTag {
 				.queryParam("type", type)
 				.queryParam("model", model)
 				.queryParam("mapping", mapping)
-				.queryParam("status", StatusType.DRAFT.name()); // Force status to DRAFT
+				.queryParam("status", StatusType.DRAFT.name())  // Force status to DRAFT
+				.queryParam("editorId", user.getAuthIdentifier());
 
 		Optional.ofNullable(path).ifPresent(p -> uriBuilder.queryParam("path", p));
 		Optional.ofNullable(metadataGroup).ifPresent(mg -> uriBuilder.queryParam("metadataGroup", mg));
@@ -116,12 +125,15 @@ public class PopulateTTLController implements ApiDocTag {
 
 		HttpEntity<String> requestEntity = new HttpEntity<>(body != null ? body : "", forwardedHeaders);
 
+		log.debug("User {} authorized for populateTTL, forwarding to ingestor service", user.getAuthIdentifier());
+
 		try {
 			ResponseEntity<String> result = restTemplate.exchange(uri, HttpMethod.POST, requestEntity, String.class);
 			EposDataModelDAO.getInstance().clearAllCaches();
+			log.info("populateTTL request successful, caches cleared");
 			return result;
 		} catch (Exception e) {
-			e.printStackTrace();
+			log.error("Error forwarding populateTTL request: {}", e.getMessage());
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
 					.body("Error forwarding request: " + e.getMessage());
 		}
