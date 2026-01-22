@@ -3,6 +3,7 @@ package org.epos.backoffice.api.util;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.epos.eposdatamodel.EPOSDataModelEntity;
@@ -59,14 +60,15 @@ public class EPOSDataModelManager {
         }
 
         List<String> userGroups = UserGroupManagementAPI.retrieveUserById(user.getAuthIdentifier()).getGroups().stream().map(UserGroup::getGroupId).collect(Collectors.toList());
-        List<Group> currentGroups = UserGroupManagementAPI.retrieveAllGroups();
 
-
-        if(userGroups.isEmpty()) userGroups.add(UserGroupManagementAPI.retrieveGroupByName("ALL").getId());
+        if(userGroups.isEmpty()) {
+            Group allGroup = UserGroupManagementAPI.retrieveGroupByName("ALL");
+            if(allGroup != null) userGroups.add(allGroup.getId());
+        }
 
         List<EPOSDataModelEntity> revertedList = new ArrayList<>();
         list.forEach(e -> {
-            if(UserGroupManagementAPI.checkIfMetaIdAndUserIdAreInSameGroup(e.getMetaId(),user.getAuthIdentifier())){
+            if (UserGroupManagementAPI.checkIfMetaIdAndUserIdAreInSameGroup(e.getMetaId(), user.getAuthIdentifier())) {
                 e.setGroups(UserGroupManagementAPI.retrieveShortGroupsFromMetaId(e.getMetaId()));
                 revertedList.add(0, e);
             }
@@ -82,43 +84,80 @@ public class EPOSDataModelManager {
 
         EposDataModelDAO.getInstance().clearAllCaches();
 
-        /** CHECK PERMISSIONS **/
-        Boolean isAccessibleByUser = false;
-
-        if(!user.getIsAdmin()){
-            if(obj.getGroups()!=null && !obj.getGroups().isEmpty()){
-                for(String groupid : obj.getGroups()){
-                    for(UserGroup group1 : user.getGroups()){
-                        if(groupid.equals(group1.getGroupId())
-                                && (
-                                group1.getRole().equals(RoleType.ADMIN)
-                                        ||group1.getRole().equals(RoleType.REVIEWER)
-                                        ||group1.getRole().equals(RoleType.EDITOR))){
-                            isAccessibleByUser = true;
-                        }
-                    }
-                }
-            }
-        }else{
-            isAccessibleByUser = true;
+        if(!checkUserPermissions(obj, user)) {
+            return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "The user can't manage this action");
         }
-        if(isAccessibleByUser) {
-            AbstractAPI dbapi = AbstractAPI.retrieveAPI(entityNames.name());
-            clazz = AbstractAPI.retrieveClass(entityNames.name());
 
-            if(obj.getInstanceId() != null)
-                obj.setInstanceChangedId(obj.getInstanceId());
+        AbstractAPI dbapi = AbstractAPI.retrieveAPI(entityNames.name());
 
-            obj.setStatus(obj.getStatus()==null? StatusType.DRAFT : obj.getStatus());
-            obj.setEditorId(user.getAuthIdentifier());
-            obj.setFileProvenance("instance created with the backoffice");
+        if(obj.getInstanceId() != null)
+            obj.setInstanceChangedId(obj.getInstanceId());
 
-            String allGroupId = UserGroupManagementAPI.retrieveGroupByName("ALL").getId();
-            if(obj.getGroups()==null || obj.getGroups().isEmpty()) obj.setGroups(List.of(allGroupId));
+        obj.setStatus(obj.getStatus()==null? StatusType.DRAFT : obj.getStatus());
+        obj.setEditorId(user.getAuthIdentifier());
+        obj.setFileProvenance("backoffice"+user.getAuthIdentifier());
 
-            LinkedEntity reference = dbapi.create(obj, null,null,null);
+        Group allGroup = UserGroupManagementAPI.retrieveGroupByName("ALL");
+        String allGroupId = (allGroup != null) ? allGroup.getId() : null;
 
-            if(obj.getGroups()!=null && !obj.getGroups().isEmpty()){
+        if((obj.getGroups()==null || obj.getGroups().isEmpty()) && allGroupId != null) {
+            obj.setGroups(List.of(allGroupId));
+        }
+
+        LinkedEntity reference = dbapi.create(obj, null,null,null);
+
+        if(obj.getGroups()!=null && !obj.getGroups().isEmpty()){
+            for(String groupid : obj.getGroups()){
+                UserGroupManagementAPI.addMetadataElementToGroup(reference.getMetaId(), groupid);
+            }
+        }
+
+        return new ApiResponseMessage(ApiResponseMessage.OK, reference);
+    }
+
+    public static ApiResponseMessage updateEposDataModelEntity(EPOSDataModelEntity obj, User user, EntityNames entityNames, Class clazz) {
+        EposDataModelDAO.getInstance().clearAllCaches();
+
+        if(!checkUserPermissions(obj, user)) {
+            return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "The user can't manage this action");
+        }
+
+        AbstractAPI dbapi = AbstractAPI.retrieveAPI(entityNames.name());
+
+        if (obj.getInstanceId() == null) {
+            return new ApiResponseMessage(ApiResponseMessage.ERROR, "InstanceId required for update");
+        }
+
+        EPOSDataModelEntity existingEntity = (EPOSDataModelEntity) dbapi.retrieve(obj.getInstanceId());
+        if (existingEntity == null) {
+            return new ApiResponseMessage(ApiResponseMessage.ERROR, "Entity not found");
+        }
+
+        StatusType currentStatus = existingEntity.getStatus();
+        StatusType newStatus = obj.getStatus() != null ? obj.getStatus() : StatusType.DRAFT;
+
+        obj.setEditorId(user.getAuthIdentifier());
+        obj.setFileProvenance("backoffice"+user.getAuthIdentifier());
+
+        if (currentStatus == StatusType.DRAFT && newStatus == StatusType.DRAFT) {
+            if (!user.getIsAdmin() && !existingEntity.getEditorId().equals(user.getAuthIdentifier())) {
+                return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "Only the creator or an Admin can modify this DRAFT.");
+            }
+
+            obj.setStatus(StatusType.DRAFT);
+            LinkedEntity reference = dbapi.create(obj, null, null, null);
+            return new ApiResponseMessage(ApiResponseMessage.OK, reference);
+        }
+
+        if (currentStatus == StatusType.PUBLISHED) {
+            obj.setInstanceId(UUID.randomUUID().toString());
+            obj.setMetaId(existingEntity.getMetaId());
+            obj.setStatus(StatusType.DRAFT);
+            obj.setInstanceChangedId(existingEntity.getInstanceId());
+
+            LinkedEntity reference = dbapi.create(obj, null, null, null);
+
+            if(obj.getGroups() != null) {
                 for(String groupid : obj.getGroups()){
                     UserGroupManagementAPI.addMetadataElementToGroup(reference.getMetaId(), groupid);
                 }
@@ -126,84 +165,58 @@ public class EPOSDataModelManager {
 
             return new ApiResponseMessage(ApiResponseMessage.OK, reference);
         }
-        return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "The user can't manage this action");
-    }
 
-    public static ApiResponseMessage updateEposDataModelEntity(EPOSDataModelEntity obj, User user, EntityNames entityNames, Class clazz) {
-
-        EposDataModelDAO.getInstance().clearAllCaches();
-
-        /** CHECK PERMISSIONS **/
-        Boolean isAccessibleByUser = false;
-
-        if(!user.getIsAdmin()){
-            if(obj.getGroups()!=null && !obj.getGroups().isEmpty()){
-                for(String groupid : obj.getGroups()){
-                    for(UserGroup group1 : user.getGroups()){
-                        if(groupid.equals(group1.getGroupId())
-                                && (
-                                group1.getRole().equals(RoleType.ADMIN)
-                                        ||group1.getRole().equals(RoleType.REVIEWER)
-                                        ||group1.getRole().equals(RoleType.EDITOR))){
-                            isAccessibleByUser = true;
-                        }
-                    }
-                }
-            }
-        }else{
-            isAccessibleByUser = true;
+        if (currentStatus == StatusType.DRAFT && newStatus == StatusType.SUBMITTED) {
+            obj.setStatus(StatusType.SUBMITTED);
+            LinkedEntity reference = dbapi.create(obj, null, null, null);
+            return new ApiResponseMessage(ApiResponseMessage.OK, reference);
         }
-        if(isAccessibleByUser) {
-            AbstractAPI dbapi = AbstractAPI.retrieveAPI(entityNames.name());
 
-            if (obj.getInstanceId() == null) {
-                return new ApiResponseMessage(ApiResponseMessage.ERROR, "InstanceId required");
-            }
-            if(obj.getInstanceChangedId() == null || obj.getInstanceChangedId().isEmpty())
-                obj.setInstanceChangedId(null);
+        if (currentStatus == StatusType.SUBMITTED && newStatus == StatusType.PUBLISHED) {
+            obj.setStatus(StatusType.PUBLISHED);
+            LinkedEntity reference = dbapi.create(obj, null, null, null);
 
-            obj.setStatus(obj.getStatus()==null? StatusType.DRAFT : obj.getStatus());
-            obj.setEditorId(user.getAuthIdentifier());
-            obj.setFileProvenance("instance created with the backoffice");
-
-            EPOSDataModelEntity eposDataModelEntity = (EPOSDataModelEntity) dbapi.retrieve(obj.getInstanceId());
-
-            if(eposDataModelEntity.getStatus()==null && obj.getStatus()!=null && (obj.getStatus().equals(StatusType.ARCHIVED) || obj.getStatus().equals(StatusType.DISCARDED))) {
-                return new ApiResponseMessage(ApiResponseMessage.ERROR, "Unable to update a  PUBLISHED instance");
-            }
-
-            if(!eposDataModelEntity.getStatus().equals(obj.getStatus())){
-                eposDataModelEntity.setStatus(obj.getStatus());
-                obj = eposDataModelEntity;
-            }
-
-            LinkedEntity reference = dbapi.create(obj, null,null,null);
-
-            if(eposDataModelEntity.getStatus().equals(StatusType.PUBLISHED)){
-                // Get the published instance of the entity and swap into archived status
-                Optional entity = dbapi.retrieveAllWithStatus(StatusType.PUBLISHED).stream()
-                        .filter(item-> ((EPOSDataModelEntity) item).getMetaId().equals(reference.getMetaId())
-                                && !((EPOSDataModelEntity) item).getInstanceId().equals(reference.getInstanceId())).findFirst();
-                if(entity.isPresent()){
-                    EPOSDataModelEntity item = (EPOSDataModelEntity) entity.get();
-                    item.setStatus(StatusType.ARCHIVED);
-                    dbapi.create(item, null,null,null);
-                }
-            }
+            archiveOldPublishedVersions(dbapi, reference.getMetaId(), reference.getInstanceId());
 
             return new ApiResponseMessage(ApiResponseMessage.OK, reference);
         }
-        return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "The user can't manage this action");
+
+        return new ApiResponseMessage(ApiResponseMessage.ERROR, "Invalid status transition from " + currentStatus + " to " + newStatus);
+    }
+
+    private static void archiveOldPublishedVersions(AbstractAPI dbapi, String metaId, String currentInstanceId) {
+        List<Object> allPublished = dbapi.retrieveAllWithStatus(StatusType.PUBLISHED);
+        for (Object item : allPublished) {
+            EPOSDataModelEntity entity = (EPOSDataModelEntity) item;
+            // If same MetaID but different InstanceID, Archive it
+            if (entity.getMetaId().equals(metaId) && !entity.getInstanceId().equals(currentInstanceId)) {
+                entity.setStatus(StatusType.ARCHIVED);
+                dbapi.create(entity, null, null, null);
+            }
+        }
+    }
+
+    private static boolean checkUserPermissions(EPOSDataModelEntity obj, User user) {
+        if(user.getIsAdmin()) return true;
+        if(obj.getGroups() == null || obj.getGroups().isEmpty()) return false; // Or true if open access? Assuming strict here.
+
+        for(String groupid : obj.getGroups()){
+            for(UserGroup group1 : user.getGroups()){
+                if(groupid.equals(group1.getGroupId())
+                        && (group1.getRole().equals(RoleType.ADMIN)
+                        || group1.getRole().equals(RoleType.REVIEWER)
+                        || group1.getRole().equals(RoleType.EDITOR))){
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     public static boolean deleteEposDataModelEntity(String instance_id, User user, EntityNames entityNames, Class clazz) {
         EposDataModelDAO.getInstance().clearAllCaches();
-
         AbstractAPI dbapi = AbstractAPI.retrieveAPI(entityNames.name());
-
         dbapi.delete(instance_id);
-
         return true;
     }
-
 }
