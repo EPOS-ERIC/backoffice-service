@@ -188,7 +188,6 @@ public class EPOSDataModelManager {
         List<Object> allPublished = dbapi.retrieveAllWithStatus(StatusType.PUBLISHED);
         for (Object item : allPublished) {
             EPOSDataModelEntity entity = (EPOSDataModelEntity) item;
-            // If same MetaID but different InstanceID, Archive it
             if (entity.getMetaId().equals(metaId) && !entity.getInstanceId().equals(currentInstanceId)) {
                 entity.setStatus(StatusType.ARCHIVED);
                 dbapi.create(entity, null, null, null);
@@ -198,7 +197,7 @@ public class EPOSDataModelManager {
 
     private static boolean checkUserPermissions(EPOSDataModelEntity obj, User user) {
         if(user.getIsAdmin()) return true;
-        if(obj.getGroups() == null || obj.getGroups().isEmpty()) return false; // Or true if open access? Assuming strict here.
+        if(obj.getGroups() == null || obj.getGroups().isEmpty()) return false;
 
         for(String groupid : obj.getGroups()){
             for(UserGroup group1 : user.getGroups()){
