@@ -23,21 +23,21 @@ public class UserManager {
 		if(instance_id.equals("self")){
 			User tempUser = UserGroupManagementAPI.retrieveUserById(user.getAuthIdentifier());
 			personList = tempUser!=null? List.of(tempUser) : new ArrayList<>();
-            System.out.println("USER STREAM SELF: "+personList);
+			System.out.println("USER STREAM SELF: "+personList);
 		}
 		else if(instance_id.equals("all")){
 			personList = UserGroupManagementAPI.retrieveAllUsers();
-            System.out.println("USER STREAM ALL: "+personList);
+			System.out.println("USER STREAM ALL: "+personList);
 		} else {
 			User tempUser = UserGroupManagementAPI.retrieveUserById(instance_id);
 			personList = tempUser!=null? List.of(tempUser) : new ArrayList<>();
-            System.out.println("ELSE STREAM ALL: "+personList);
+			System.out.println("ELSE STREAM ALL: "+personList);
 		}
 
 		List<User> userStream = personList.stream()
 				.filter(x -> x.getAuthIdentifier() != null && !x.getAuthIdentifier().isEmpty()).collect(Collectors.toList());
 
-        System.out.println("USER STREAM: "+userStream);
+		System.out.println("USER STREAM: "+userStream);
 
 		if (userStream.isEmpty())
 			return new ApiResponseMessage(ApiResponseMessage.OK, true, new ArrayList<User>());
