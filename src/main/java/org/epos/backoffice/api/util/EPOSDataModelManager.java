@@ -133,12 +133,27 @@ public class EPOSDataModelManager {
         entityToSave.setEditorId(user.getAuthIdentifier());
         entityToSave.setFileProvenance("backoffice");
 
-        // DRAFT -> DRAFT: Update existing (same user only)
+        // DRAFT -> DRAFT: Check if same user or create new DRAFT
         if (currentStatus == StatusType.DRAFT && newStatus == StatusType.DRAFT) {
-            if (!user.getIsAdmin() && !existingEntity.getEditorId().equals(user.getAuthIdentifier())) {
-                return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "Only the creator or an Admin can modify this DRAFT.");
+            // If same user, modify existing DRAFT
+            if (user.getIsAdmin() || existingEntity.getEditorId().equals(user.getAuthIdentifier())) {
+                LinkedEntity reference = dbapi.create(entityToSave, null, null, null);
+                return new ApiResponseMessage(ApiResponseMessage.OK, reference);
             }
+            // Different user trying to modify someone else's DRAFT -> Create NEW DRAFT
+            // This allows multiple users to have their own DRAFTs of the same entity
+            entityToSave.setInstanceId(UUID.randomUUID().toString());
+            entityToSave.setMetaId(existingEntity.getMetaId());
+            entityToSave.setInstanceChangedId(existingEntity.getInstanceChangedId() != null ?
+                    existingEntity.getInstanceChangedId() : existingEntity.getInstanceId());
+
             LinkedEntity reference = dbapi.create(entityToSave, null, null, null);
+
+            if(existingEntity.getGroups() != null) {
+                for(String gid : existingEntity.getGroups()) {
+                    UserGroupManagementAPI.addMetadataElementToGroup(reference.getMetaId(), gid);
+                }
+            }
             return new ApiResponseMessage(ApiResponseMessage.OK, reference);
         }
 
@@ -167,6 +182,10 @@ public class EPOSDataModelManager {
 
         // DRAFT -> SUBMITTED: Status change only
         if (currentStatus == StatusType.DRAFT && newStatus == StatusType.SUBMITTED) {
+            // Only the owner or admin can submit
+            if (!user.getIsAdmin() && !existingEntity.getEditorId().equals(user.getAuthIdentifier())) {
+                return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "Only the DRAFT owner or Admin can submit.");
+            }
             LinkedEntity reference = dbapi.create(entityToSave, null, null, null);
             return new ApiResponseMessage(ApiResponseMessage.OK, reference);
         }
