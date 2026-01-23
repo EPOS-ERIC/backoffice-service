@@ -133,17 +133,23 @@ public class EPOSDataModelManager {
         entityToSave.setEditorId(user.getAuthIdentifier());
         entityToSave.setFileProvenance("backoffice");
 
+        // DRAFT -> DRAFT: Update existing (same user only)
         if (currentStatus == StatusType.DRAFT && newStatus == StatusType.DRAFT) {
             if (!user.getIsAdmin() && !existingEntity.getEditorId().equals(user.getAuthIdentifier())) {
                 return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "Only the creator or an Admin can modify this DRAFT.");
             }
-            // Usa entityToSave (che ha i dati completi)
             LinkedEntity reference = dbapi.create(entityToSave, null, null, null);
             return new ApiResponseMessage(ApiResponseMessage.OK, reference);
         }
 
-        if (currentStatus == StatusType.PUBLISHED) {
+        // PUBLISHED -> ARCHIVED: Direct status change (no new version)
+        if (currentStatus == StatusType.PUBLISHED && newStatus == StatusType.ARCHIVED) {
+            LinkedEntity reference = dbapi.create(entityToSave, null, null, null);
+            return new ApiResponseMessage(ApiResponseMessage.OK, reference);
+        }
 
+        // PUBLISHED -> any other modification: Create new DRAFT version
+        if (currentStatus == StatusType.PUBLISHED && newStatus != StatusType.ARCHIVED) {
             entityToSave.setInstanceId(UUID.randomUUID().toString());
             entityToSave.setMetaId(existingEntity.getMetaId());
             entityToSave.setStatus(StatusType.DRAFT);
@@ -159,15 +165,22 @@ public class EPOSDataModelManager {
             return new ApiResponseMessage(ApiResponseMessage.OK, reference);
         }
 
-        if ((currentStatus == StatusType.DRAFT && newStatus == StatusType.SUBMITTED) ||
-                (currentStatus == StatusType.SUBMITTED && newStatus == StatusType.PUBLISHED)) {
-
+        // DRAFT -> SUBMITTED: Status change only
+        if (currentStatus == StatusType.DRAFT && newStatus == StatusType.SUBMITTED) {
             LinkedEntity reference = dbapi.create(entityToSave, null, null, null);
-
-            if (newStatus == StatusType.PUBLISHED) {
-                archiveOldPublishedVersions(dbapi, reference.getMetaId(), reference.getInstanceId());
-            }
             return new ApiResponseMessage(ApiResponseMessage.OK, reference);
+        }
+
+        // SUBMITTED -> PUBLISHED: Status change + archive old PUBLISHED versions
+        if (currentStatus == StatusType.SUBMITTED && newStatus == StatusType.PUBLISHED) {
+            LinkedEntity reference = dbapi.create(entityToSave, null, null, null);
+            archiveOldPublishedVersions(dbapi, reference.getMetaId(), reference.getInstanceId());
+            return new ApiResponseMessage(ApiResponseMessage.OK, reference);
+        }
+
+        // ARCHIVED -> any: Not allowed (ARCHIVED entities are read-only)
+        if (currentStatus == StatusType.ARCHIVED) {
+            return new ApiResponseMessage(ApiResponseMessage.ERROR, "Cannot modify ARCHIVED entity. ARCHIVED entities are read-only.");
         }
 
         return new ApiResponseMessage(ApiResponseMessage.ERROR, "Invalid status transition from " + currentStatus + " to " + newStatus);
