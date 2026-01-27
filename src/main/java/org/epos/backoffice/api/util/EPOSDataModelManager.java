@@ -2,17 +2,25 @@ package org.epos.backoffice.api.util;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
+import org.epos.eposdatamodel.DataProduct;
+import org.epos.eposdatamodel.Distribution;
 import org.epos.eposdatamodel.EPOSDataModelEntity;
 import org.epos.eposdatamodel.Group;
 import org.epos.eposdatamodel.LinkedEntity;
 import org.epos.eposdatamodel.User;
 import org.epos.eposdatamodel.UserGroup;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.web.client.RestTemplate;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import abstractapis.AbstractAPI;
+import commonapis.LinkedEntityAPI;
 import dao.EposDataModelDAO;
 import metadataapis.EntityNames;
 import model.RoleType;
@@ -20,6 +28,9 @@ import model.StatusType;
 import usermanagementapis.UserGroupManagementAPI;
 
 public class EPOSDataModelManager {
+
+    private static final Logger log = LoggerFactory.getLogger(EPOSDataModelManager.class);
+    private static final RestTemplate restTemplate = new RestTemplate();
 
     public static ApiResponseMessage getEPOSDataModelEposDataModelEntity(String meta_id, String instance_id, User user, EntityNames entityNames, Class clazz) {
 
@@ -97,6 +108,12 @@ public class EPOSDataModelManager {
         }
 
         LinkedEntity reference = dbapi.create(obj, null, null, null);
+
+		if (obj instanceof DataProduct && obj.getInstanceChangedId() != null) {
+			CompletableFuture.runAsync(() -> {
+				updatePluginsForDraftDistribution(reference, (DataProduct) obj);
+			});
+		}
 
         if(obj.getGroups()!=null && !obj.getGroups().isEmpty()){
             for(String groupid : obj.getGroups()){
@@ -240,4 +257,185 @@ public class EPOSDataModelManager {
         dbapi.delete(instance_id);
         return true;
     }
+
+	private static void updatePluginsForDraftDistribution(LinkedEntity newDataProductLinkedEntity, DataProduct oldDataProduct) {
+		if (newDataProductLinkedEntity == null || oldDataProduct == null) {
+			return;
+		}
+
+		// TODO: don't stop everything on single post fail, try the others
+		try {
+			DataProduct newDataProduct = (DataProduct) LinkedEntityAPI.retrieveFromLinkedEntity(newDataProductLinkedEntity);
+
+			List<Distribution> oldDistributions = new ArrayList<>();
+			List<Distribution> newDistributions = new ArrayList<>();
+
+			for (var linkedEntity: newDataProduct.getDistribution()){
+				Distribution distribution = (Distribution) LinkedEntityAPI.retrieveFromLinkedEntity(linkedEntity);
+				if (distribution == null) {
+					continue;
+				}
+				newDistributions.add(distribution);
+			}
+			for (var linkedEntity: oldDataProduct.getDistribution()){
+				Distribution distribution = (Distribution) LinkedEntityAPI.retrieveFromLinkedEntity(linkedEntity);
+				if (distribution == null) {
+					continue;
+				}
+				oldDistributions.add(distribution);
+			}
+
+
+			// match the distributions from the old and new
+			for (var newDistribution: newDistributions) {
+				for (var oldDistribution: oldDistributions) {
+					if (newDistribution.getMetaId().equals(oldDistribution.getMetaId())) {
+						// they are the same, we have to update the new one
+						try {
+							String getUrl = "http://converter-service:8080/api/converter-service/v1/distributions/" + oldDistribution.getInstanceId();
+							PluginResponse relations = restTemplate.getForObject(getUrl, PluginResponse.class);
+							if (relations != null) {
+								for (PluginResponse.PluginRelation relation : relations.getRelations()) {
+									var rel = relation.getRelation();
+									PluginResponse.Relation newRel = new PluginResponse.Relation(rel.getId(), rel.getInputFormat(), rel.getOutputFormat(), rel.getPluginId(), newDistribution.getInstanceId());
+									restTemplate.postForObject("http://converter-service:8080/api/converter-service/v1/plugin-relations", newRel, Void.class);
+								}
+							}
+						} catch (Exception e) {
+							log.error("Failed to associate plugins for distribution {}: {}", newDistribution.getInstanceId(), e.getMessage(), e);
+						}
+					}
+				}
+			}
+		} catch (Exception e) {
+			log.error("Failed to associate plugins for distribution {}: {}", newDataProductLinkedEntity.getInstanceId(), e.getMessage(), e);
+		}
+	}
+
+	public static class PluginResponse {
+		@JsonProperty("instance_id")
+		private String instanceId;
+		private List<PluginRelation> relations;
+		
+		public PluginResponse() {}
+		
+		public PluginResponse(String instanceId, List<PluginRelation> relations) {
+			this.instanceId = instanceId;
+			this.relations = relations;
+		}
+		
+		public String getInstanceId() { return instanceId; }
+		public void setInstanceId(String instanceId) { this.instanceId = instanceId; }
+		public List<PluginRelation> getRelations() { return relations; }
+		public void setRelations(List<PluginRelation> relations) { this.relations = relations; }
+		
+		public static class PluginRelation {
+			private Plugin plugin;
+			private Relation relation;
+			
+			public PluginRelation() {}
+			
+			public PluginRelation(Plugin plugin, Relation relation) {
+				this.plugin = plugin;
+				this.relation = relation;
+			}
+			
+			public Plugin getPlugin() { return plugin; }
+			public void setPlugin(Plugin plugin) { this.plugin = plugin; }
+			public Relation getRelation() { return relation; }
+			public void setRelation(Relation relation) { this.relation = relation; }
+
+			@Override
+			public String toString() {
+				return "PluginRelation [plugin=" + plugin + ", relation=" + relation + "]";
+			}
+		}
+		
+		public static class Plugin {
+			private String arguments;
+			private String description;
+			private Boolean enabled;
+			private String executable;
+			private String id;
+			private Boolean installed;
+			private String name;
+			private String repository;
+			private String runtime;
+			private String version;
+			@JsonProperty("version_type")
+			private String versionType;
+			
+			public Plugin() {}
+			
+			// Getters and Setters
+			public String getArguments() { return arguments; }
+			public void setArguments(String arguments) { this.arguments = arguments; }
+			public String getDescription() { return description; }
+			public void setDescription(String description) { this.description = description; }
+			public Boolean getEnabled() { return enabled; }
+			public void setEnabled(Boolean enabled) { this.enabled = enabled; }
+			public String getExecutable() { return executable; }
+			public void setExecutable(String executable) { this.executable = executable; }
+			public String getId() { return id; }
+			public void setId(String id) { this.id = id; }
+			public Boolean getInstalled() { return installed; }
+			public void setInstalled(Boolean installed) { this.installed = installed; }
+			public String getName() { return name; }
+			public void setName(String name) { this.name = name; }
+			public String getRepository() { return repository; }
+			public void setRepository(String repository) { this.repository = repository; }
+			public String getRuntime() { return runtime; }
+			public void setRuntime(String runtime) { this.runtime = runtime; }
+			public String getVersion() { return version; }
+			public void setVersion(String version) { this.version = version; }
+			public String getVersionType() { return versionType; }
+			public void setVersionType(String versionType) { this.versionType = versionType; }
+
+			@Override
+			public String toString() {
+				return "Plugin [arguments=" + arguments + ", description=" + description + ", enabled=" + enabled + ", executable=" + executable + ", id=" + id + ", installed=" + installed + ", name=" + name + ", repository=" + repository + ", runtime=" + runtime + ", version=" + version + ", versionType=" + versionType + "]";
+			}
+		}
+		
+		public static class Relation {
+			private String id;
+			@JsonProperty("input_format")
+			private String inputFormat;
+			
+			@JsonProperty("output_format")
+			private String outputFormat;
+			
+			@JsonProperty("plugin_id")
+			private String pluginId;
+			
+			@JsonProperty("relation_id")
+			private String relationId;
+			
+			public Relation() {}
+			
+			public Relation(String id, String inputFormat, String outputFormat, String pluginId, String relationId) {
+				this.id = id;
+				this.inputFormat = inputFormat;
+				this.outputFormat = outputFormat;
+				this.pluginId = pluginId;
+				this.relationId = relationId;
+			}
+			
+			public String getId() { return id; }
+			public void setId(String id) { this.id = id; }
+			public String getInputFormat() { return inputFormat; }
+			public void setInputFormat(String inputFormat) { this.inputFormat = inputFormat; }
+			public String getOutputFormat() { return outputFormat; }
+			public void setOutputFormat(String outputFormat) { this.outputFormat = outputFormat; }
+			public String getPluginId() { return pluginId; }
+			public void setPluginId(String pluginId) { this.pluginId = pluginId; }
+			public String getRelationId() { return relationId; }
+			public void setRelationId(String relationId) { this.relationId = relationId; }
+
+			@Override
+			public String toString() {
+				return "Relation [id=" + id + ", inputFormat=" + inputFormat + ", outputFormat=" + outputFormat + ", pluginId=" + pluginId + ", relationId=" + relationId + "]";
+			}
+		}
+	}
 }
