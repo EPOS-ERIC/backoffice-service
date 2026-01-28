@@ -6,6 +6,7 @@ import metadataapis.EntityNames;
 import org.epos.backoffice.api.util.ApiResponseMessage;
 import org.epos.backoffice.api.util.EPOSDataModelManager;
 import org.epos.eposdatamodel.*;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -31,6 +32,9 @@ public abstract class MetadataAbstractController<T extends EPOSDataModelEntity> 
 		}
 
 		User user = getUserFromSession();
+		if (user == null) {
+			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized: User not found in session.");
+		}
 
 		List items = EPOSDataModelManager.getEPOSDataModelEposDataModelEntity(meta_id,instance_id,user,EntityNames.valueOf(entityType.getSimpleName().toUpperCase()),entityType).getListOfEntities();
 
