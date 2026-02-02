@@ -1,20 +1,34 @@
 package org.epos.backoffice.api.controller;
 
-import abstractapis.AbstractAPI;
+import java.net.URI;
+
+import org.epos.eposdatamodel.Distribution;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
+
+import abstractapis.AbstractAPI;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import metadataapis.EntityNames;
-import org.epos.eposdatamodel.Distribution;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.http.*;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.client.RestTemplate;
-
 import jakarta.servlet.http.HttpServletRequest;
+import metadataapis.EntityNames;
 
 @RestController
 @RequestMapping(value = "/distribution-plugin", produces = { "application/json" })
@@ -127,7 +141,11 @@ public class DistributionPluginController extends MetadataAbstractController<Dis
 
         ExternalEmailRequest externalRequest = new ExternalEmailRequest(bodyBuilder.toString(), subject);
 
-        String url = "http://email-sender-service:8080/api/email-sender-service/v1/sender/send-email-plugin";
+        URI url = UriComponentsBuilder.fromUriString("http://email-sender-service:8080")
+                .path("/api/email-sender-service/v1/sender/send-email-group/")
+                .pathSegment("Plugin Managers")
+                .build()
+                .toUri();
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);

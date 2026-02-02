@@ -36,7 +36,8 @@ public class InterceptorConfiguration implements WebMvcConfigurer {
                         "/softwareapplication/**",
                         "/softwaresourcecode/**",
                         "/populate-ttl/**",
-						"/distribution-plugin/**"
+						"/distribution-plugin/**",
+						"/review-notification/**"
                 )
         );
     }
