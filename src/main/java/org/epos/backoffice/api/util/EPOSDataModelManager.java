@@ -174,14 +174,19 @@ public class EPOSDataModelManager {
             return new ApiResponseMessage(ApiResponseMessage.OK, reference);
         }
 
-        // PUBLISHED -> ARCHIVED: Direct status change (no new version)
-        if (currentStatus == StatusType.PUBLISHED && newStatus == StatusType.ARCHIVED) {
+        // PUBLISHED -> ARCHIVED/DISCARDED: Direct status change (no new version)
+        if (currentStatus == StatusType.PUBLISHED && (newStatus == StatusType.ARCHIVED || newStatus == StatusType.DISCARDED)) {
+            LinkedEntity reference = dbapi.create(entityToSave, null, null, null);
+            return new ApiResponseMessage(ApiResponseMessage.OK, reference);
+        }
+
+        if ((currentStatus == StatusType.DRAFT || currentStatus == StatusType.SUBMITTED) && newStatus == StatusType.DISCARDED) {
             LinkedEntity reference = dbapi.create(entityToSave, null, null, null);
             return new ApiResponseMessage(ApiResponseMessage.OK, reference);
         }
 
         // PUBLISHED -> any other modification: Create new DRAFT version
-        if (currentStatus == StatusType.PUBLISHED && newStatus != StatusType.ARCHIVED) {
+        if (currentStatus == StatusType.PUBLISHED && (newStatus != StatusType.ARCHIVED || newStatus != StatusType.DISCARDED)) {
             entityToSave.setInstanceId(UUID.randomUUID().toString());
             entityToSave.setMetaId(existingEntity.getMetaId());
             entityToSave.setStatus(StatusType.DRAFT);
