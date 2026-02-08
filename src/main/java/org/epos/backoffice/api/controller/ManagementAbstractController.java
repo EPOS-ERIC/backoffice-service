@@ -61,15 +61,22 @@ public abstract class ManagementAbstractController<T> extends BasicController<T>
 					.body(new ApiResponseMessage(ApiResponseMessage.ERROR, "The [instance_id] field can't be left blank"));
 
 		User user = getUserFromSession();
-
-		boolean done = false;
-
-		if(!entityType.equals(User.class)) {
-			done = EPOSDataModelManager.deleteEposDataModelEntity(instance_id,user,EntityNames.valueOf(entityType.getSimpleName().toUpperCase()),entityType);
+		if (user == null) {
+			return ResponseEntity.status(401).body("Unauthorized: User not found in session.");
 		}
 
-		if(done) return ResponseEntity.status(200).body(new ApiResponseMessage(ApiResponseMessage.OK, "Instance deleted"));
-		else return ResponseEntity.status(400).body(new ApiResponseMessage(ApiResponseMessage.ERROR, "Instance not deleted"));
+		if(!entityType.equals(User.class)) {
+			ApiResponseMessage response = EPOSDataModelManager.deleteEposDataModelEntity(instance_id,user,EntityNames.valueOf(entityType.getSimpleName().toUpperCase()),entityType);
+			if(response.getCode() == ApiResponseMessage.OK) {
+				return ResponseEntity.status(200).body(response);
+			} else if(response.getCode() == ApiResponseMessage.UNAUTHORIZED) {
+				return ResponseEntity.status(403).body(response);
+			} else {
+				return ResponseEntity.status(400).body(response);
+			}
+		}
+
+		return ResponseEntity.status(400).body(new ApiResponseMessage(ApiResponseMessage.ERROR, "Instance not deleted"));
 	}
 
 	protected ResponseEntity<?> postMethod(EPOSDataModelEntity body, boolean takeCareOfTheParent) {

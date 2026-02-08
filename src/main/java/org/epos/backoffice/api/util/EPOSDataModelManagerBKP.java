@@ -29,9 +29,9 @@ import usermanagementapis.UserGroupManagementAPI;
 
 import static abstractapis.AbstractRelationsAPI.getDbaccess;
 
-public class EPOSDataModelManager {
+public class EPOSDataModelManagerBKP {
 
-    private static final Logger log = LoggerFactory.getLogger(EPOSDataModelManager.class);
+    private static final Logger log = LoggerFactory.getLogger(EPOSDataModelManagerBKP.class);
     private static final RestTemplate restTemplate = new RestTemplate();
 
     public static ApiResponseMessage getEPOSDataModelEposDataModelEntity(String meta_id, String instance_id, User user, EntityNames entityNames, Class clazz) {
@@ -51,26 +51,26 @@ public class EPOSDataModelManager {
 
         List<EPOSDataModelEntity> list;
         if (meta_id.equals("all")) {
-            // Retrieve all entities, only filter by user permissions
             list = dbapi.retrieveAll();
             list = list.stream()
+                    .filter(elem -> elem.getMetaId().equals(meta_id))
                     .filter(elem -> checkUserPermissionsReadOnly(elem, user))
                     .collect(Collectors.toList());
         } else {
             if(instance_id.equals("all")) {
-                // Retrieve all instances for a specific meta_id
                 list = dbapi.retrieveAll();
                 list = list.stream()
                         .filter(elem -> elem.getMetaId().equals(meta_id))
                         .filter(elem -> checkUserPermissionsReadOnly(elem, user))
                         .collect(Collectors.toList());
             } else {
-                // Retrieve a specific instance
                 list = new ArrayList<>();
                 EPOSDataModelEntity entity = (EPOSDataModelEntity) dbapi.retrieve(instance_id);
-                if(entity != null && entity.getMetaId().equals(meta_id) && checkUserPermissionsReadOnly(entity, user)) {
-                    list.add(entity);
-                }
+                if(entity!=null) list.add(entity);
+                list = list.stream()
+                        .filter(elem -> elem.getMetaId().equals(meta_id))
+                        .filter(elem -> checkUserPermissionsReadOnly(elem, user))
+                        .collect(Collectors.toList());
             }
         }
 
@@ -168,7 +168,7 @@ public class EPOSDataModelManager {
         // DRAFT -> DRAFT: Check if same user or create new DRAFT
         if (currentStatus == StatusType.DRAFT && newStatus == StatusType.DRAFT) {
             // If same user, modify existing DRAFT
-            if (user.getIsAdmin() || user.getAuthIdentifier().equals(existingEntity.getEditorId())) {
+            if (user.getIsAdmin() || existingEntity.getEditorId().equals(user.getAuthIdentifier())) {
                 LinkedEntity reference = dbapi.create(entityToSave, null, null, null);
                 return new ApiResponseMessage(ApiResponseMessage.OK, reference);
             }
@@ -201,7 +201,7 @@ public class EPOSDataModelManager {
         }
 
         // PUBLISHED -> any other modification: Create new DRAFT version
-        if (currentStatus == StatusType.PUBLISHED && newStatus != StatusType.ARCHIVED && newStatus != StatusType.DISCARDED) {
+        if (currentStatus == StatusType.PUBLISHED && (newStatus != StatusType.ARCHIVED || newStatus != StatusType.DISCARDED)) {
             entityToSave.setInstanceId(UUID.randomUUID().toString());
             entityToSave.setMetaId(existingEntity.getMetaId());
             entityToSave.setStatus(StatusType.DRAFT);
@@ -220,7 +220,7 @@ public class EPOSDataModelManager {
         // DRAFT -> SUBMITTED: Status change only
         if (currentStatus == StatusType.DRAFT && newStatus == StatusType.SUBMITTED) {
             // Only the owner or admin can submit
-            if (!user.getIsAdmin() && !user.getAuthIdentifier().equals(existingEntity.getEditorId())) {
+            if (!user.getIsAdmin() && !existingEntity.getEditorId().equals(user.getAuthIdentifier())) {
                 return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "Only the DRAFT owner or Admin can submit.");
             }
             LinkedEntity reference = dbapi.create(entityToSave, null, null, null);
@@ -229,10 +229,6 @@ public class EPOSDataModelManager {
 
         // SUBMITTED -> PUBLISHED: Status change + archive old PUBLISHED versions
         if (currentStatus == StatusType.SUBMITTED && newStatus == StatusType.PUBLISHED) {
-            // Only admin or reviewer can publish
-            if (!user.getIsAdmin() && !hasReviewerRole(user, existingEntity)) {
-                return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "Only Admin or Reviewer can publish.");
-            }
             LinkedEntity reference = dbapi.create(entityToSave, null, null, null);
             archiveOldPublishedVersions(dbapi, reference.getMetaId(), reference.getInstanceId());
             return new ApiResponseMessage(ApiResponseMessage.OK, reference);
@@ -269,14 +265,14 @@ public class EPOSDataModelManager {
 
                 List<MetadataGroupUser> metadataGroupUserList = getDbaccess().getFromDBByUsingMultipleKeys(filters,MetadataGroupUser.class);
 
-                log.debug("metadataGroupUserList RW: {}", metadataGroupUserList);
-                for(MetadataGroupUser metadataGroupUser : metadataGroupUserList){
-                    if((metadataGroupUser.getRole().equals(RoleType.ADMIN)
-                            || metadataGroupUser.getRole().equals(RoleType.REVIEWER)
-                            || metadataGroupUser.getRole().equals(RoleType.EDITOR))
-                        && metadataGroupUser.getRequestStatus().equals(RequestStatusType.ACCEPTED)){
-                        return true;
-                    }
+                System.out.println("metadataGroupUserList RW: "+metadataGroupUserList);
+                if(!metadataGroupUserList.isEmpty()){
+                        if((metadataGroupUserList.get(0).getRole().equals(RoleType.ADMIN)
+                                || metadataGroupUserList.get(0).getRole().equals(RoleType.REVIEWER)
+                                || metadataGroupUserList.get(0).getRole().equals(RoleType.EDITOR))
+                            && metadataGroupUserList.get(0).getRequestStatus().equals(RequestStatusType.ACCEPTED)){
+                            return true;
+                        }
                 }
             }
             return false;
@@ -295,9 +291,9 @@ public class EPOSDataModelManager {
 
                 List<MetadataGroupUser> metadataGroupUserList = getDbaccess().getFromDBByUsingMultipleKeys(filters,MetadataGroupUser.class);
 
-                log.debug("metadataGroupUserList RO: {}", metadataGroupUserList);
-                for(MetadataGroupUser metadataGroupUser : metadataGroupUserList){
-                    if(metadataGroupUser.getRequestStatus().equals(RequestStatusType.ACCEPTED)){
+                System.out.println("metadataGroupUserList RO: "+metadataGroupUserList);
+                if(!metadataGroupUserList.isEmpty()){
+                    if(metadataGroupUserList.get(0).getRequestStatus().equals(RequestStatusType.ACCEPTED)){
                         return true;
                     }
                 }
@@ -307,41 +303,11 @@ public class EPOSDataModelManager {
         return true;
     }
 
-    private static boolean hasReviewerRole(User user, EPOSDataModelEntity obj) {
-        if(obj.getGroups() != null && !obj.getGroups().isEmpty()){
-            for(String groupid : obj.getGroups()){
-                Map<String, Object> filters = new HashMap<>();
-                filters.put("group.id", groupid);
-                filters.put("authIdentifier.authIdentifier", user.getAuthIdentifier());
-
-                List<MetadataGroupUser> metadataGroupUserList = getDbaccess().getFromDBByUsingMultipleKeys(filters, MetadataGroupUser.class);
-
-                for(MetadataGroupUser metadataGroupUser : metadataGroupUserList){
-                    if((metadataGroupUser.getRole().equals(RoleType.ADMIN) || metadataGroupUser.getRole().equals(RoleType.REVIEWER))
-                        && metadataGroupUser.getRequestStatus().equals(RequestStatusType.ACCEPTED)){
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
-    }
-
-    public static ApiResponseMessage deleteEposDataModelEntity(String instance_id, User user, EntityNames entityNames, Class clazz) {
+    public static boolean deleteEposDataModelEntity(String instance_id, User user, EntityNames entityNames, Class clazz) {
         EposDataModelDAO.getInstance().clearAllCaches();
         AbstractAPI dbapi = AbstractAPI.retrieveAPI(entityNames.name());
-        
-        EPOSDataModelEntity existingEntity = (EPOSDataModelEntity) dbapi.retrieve(instance_id);
-        if(existingEntity == null) {
-            return new ApiResponseMessage(ApiResponseMessage.ERROR, "Entity not found");
-        }
-        
-        if(!checkUserPermissionsReadWrite(existingEntity, user)) {
-            return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "The user can't delete this entity");
-        }
-        
         dbapi.delete(instance_id);
-        return new ApiResponseMessage(ApiResponseMessage.OK, "Entity deleted successfully");
+        return true;
     }
 
 	private static void updatePluginsForDraftDistribution(LinkedEntity newDataProductLinkedEntity, DataProduct oldDataProduct) {
