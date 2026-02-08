@@ -85,6 +85,23 @@ public class UserManager {
 		return new ApiResponseMessage(ApiResponseMessage.ERROR, "You can't add the user to group");
 	}
 
+	public static ApiResponseMessage updateUserToGroup(AddUserToGroupBean userGroup, User user) {
+		EposDataModelDAO.getInstance().clearAllCaches();
+
+		if(!user.getIsAdmin() && userGroup.getStatusType().equals("ACCEPTED")) return new ApiResponseMessage(ApiResponseMessage.ERROR, "You can't update users to groups");
+
+		Boolean result = UserGroupManagementAPI.updateUserInGroup(
+				userGroup.getGroupid(),
+				userGroup.getUserid(),
+				RoleType.valueOf(userGroup.getRole()),
+				RequestStatusType.valueOf(userGroup.getStatusType()));
+
+		if(result!=null && result)
+			return new ApiResponseMessage(ApiResponseMessage.OK, "User updated successfully");
+
+		return new ApiResponseMessage(ApiResponseMessage.ERROR, "You can't update the user to group");
+	}
+
 
 	public static ApiResponseMessage removeUserFromGroup(RemoveUserFromGroupBean removeUserFromGroupBean, User user) {
 		EposDataModelDAO.getInstance().clearAllCaches();
