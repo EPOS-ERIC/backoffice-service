@@ -88,7 +88,7 @@ public class UserManager {
 	public static ApiResponseMessage updateUserToGroup(AddUserToGroupBean userGroup, User user) {
 		EposDataModelDAO.getInstance().clearAllCaches();
 
-		if(!user.getIsAdmin() && userGroup.getStatusType().equals("ACCEPTED")) return new ApiResponseMessage(ApiResponseMessage.ERROR, "You can't update users to groups");
+		if(!user.getIsAdmin() && userGroup.getStatusType().equals("ACCEPTED")) return addUserToGroup(userGroup, user);
 
 		Boolean result = UserGroupManagementAPI.updateUserInGroup(
 				userGroup.getGroupid(),
