@@ -339,10 +339,16 @@ public class EPOSDataModelManager {
         // Check if entity belongs to the "ALL" group - if so, any authenticated user with 
         // at least one ACCEPTED group membership can read it (ALL is the public group)
         Group allGroup = UserGroupManagementAPI.retrieveGroupByName("ALL");
-        if(allGroup != null && obj.getGroups().contains(allGroup.getId())) {
+        String allGroupId = allGroup != null ? allGroup.getId() : null;
+        boolean entityInAllGroup = allGroupId != null && obj.getGroups().contains(allGroupId);
+        log.info("checkUserPermissionsReadOnly - ALL group ID: {}, entity groups: {}, entityInAllGroup: {}", 
+                allGroupId, obj.getGroups(), entityInAllGroup);
+        if(entityInAllGroup) {
             // User must be a member of at least one group with ACCEPTED status to read public content
-            if(userHasAnyAcceptedGroupMembership(user)) {
-                log.debug("checkUserPermissionsReadOnly - entity is in ALL group and user has accepted membership, returning true");
+            boolean hasAccepted = userHasAnyAcceptedGroupMembership(user);
+            log.info("checkUserPermissionsReadOnly - entity is in ALL group, userHasAnyAcceptedGroupMembership: {}", hasAccepted);
+            if(hasAccepted) {
+                log.info("checkUserPermissionsReadOnly - granting access via ALL group");
                 return true;
             }
         }
