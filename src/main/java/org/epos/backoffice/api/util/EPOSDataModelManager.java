@@ -336,30 +336,13 @@ public class EPOSDataModelManager {
             return false;
         }
 
-        // Check if entity belongs to the "ALL" group - if so, any authenticated user with 
-        // at least one ACCEPTED group membership can read it (ALL is the public group)
-        Group allGroup = UserGroupManagementAPI.retrieveGroupByName("ALL");
-        String allGroupId = allGroup != null ? allGroup.getId() : null;
-        boolean entityInAllGroup = allGroupId != null && obj.getGroups().contains(allGroupId);
-        log.info("[DEBUG-PERM] checkUserPermissionsReadOnly - ALL group ID: {}, entity groups: {}, entityInAllGroup: {}", 
-                allGroupId, obj.getGroups(), entityInAllGroup);
-        if(entityInAllGroup) {
-            // User must be a member of at least one group with ACCEPTED status to read public content
-            boolean hasAccepted = userHasAnyAcceptedGroupMembership(user);
-            log.info("[DEBUG-PERM] checkUserPermissionsReadOnly - entity is in ALL group, userHasAnyAcceptedGroupMembership: {}", hasAccepted);
-            if(hasAccepted) {
-                log.info("[DEBUG-PERM] checkUserPermissionsReadOnly - GRANTING ACCESS via ALL group for entity: {}", obj.getMetaId());
-                return true;
-            }
-        }
-
-        // Check if user is a member of any of the entity's groups
+        // First check if user is a member of any of the entity's groups with ACCEPTED status
         for(String groupid : obj.getGroups()){
             Map<String, Object> filters = new HashMap<>();
             filters.put("group.id", groupid);
             filters.put("authIdentifier.authIdentifier", user.getAuthIdentifier());
 
-            List<MetadataGroupUser> metadataGroupUserList = getDbaccess().getFromDBByUsingMultipleKeys(filters,MetadataGroupUser.class);
+            List<MetadataGroupUser> metadataGroupUserList = getDbaccess().getFromDBByUsingMultipleKeys(filters, MetadataGroupUser.class);
 
             log.info("[DEBUG-PERM] checkUserPermissionsReadOnly - checking groupId: {}, found {} memberships", groupid, metadataGroupUserList.size());
             for(MetadataGroupUser metadataGroupUser : metadataGroupUserList){
@@ -373,6 +356,41 @@ public class EPOSDataModelManager {
                 }
             }
         }
+
+        // Check if entity belongs to the "ALL" group - if so, any authenticated user with 
+        // at least one ACCEPTED group membership can read it (ALL is the public group)
+        Group allGroup = UserGroupManagementAPI.retrieveGroupByName("ALL");
+        String allGroupId = allGroup != null ? allGroup.getId() : null;
+        String allGroupName = allGroup != null ? allGroup.getName() : null;
+        
+        // Check both by ID and by name to handle potential mismatches in how groups are stored
+        boolean entityInAllGroup = false;
+        if(allGroupId != null) {
+            entityInAllGroup = obj.getGroups().contains(allGroupId);
+        }
+        // Also check by name in case groups are stored by name instead of ID
+        if(!entityInAllGroup && allGroupName != null) {
+            entityInAllGroup = obj.getGroups().contains(allGroupName);
+        }
+        // Also check for case-insensitive "ALL" in entity groups
+        if(!entityInAllGroup) {
+            entityInAllGroup = obj.getGroups().stream()
+                    .anyMatch(g -> "ALL".equalsIgnoreCase(g));
+        }
+        
+        log.info("[DEBUG-PERM] checkUserPermissionsReadOnly - ALL group ID: {}, ALL group name: {}, entity groups: {}, entityInAllGroup: {}", 
+                allGroupId, allGroupName, obj.getGroups(), entityInAllGroup);
+        
+        if(entityInAllGroup) {
+            // User must be a member of at least one group with ACCEPTED status to read public content
+            boolean hasAccepted = userHasAnyAcceptedGroupMembership(user);
+            log.info("[DEBUG-PERM] checkUserPermissionsReadOnly - entity is in ALL group, userHasAnyAcceptedGroupMembership: {}", hasAccepted);
+            if(hasAccepted) {
+                log.info("[DEBUG-PERM] checkUserPermissionsReadOnly - GRANTING ACCESS via ALL group for entity: {}", obj.getMetaId());
+                return true;
+            }
+        }
+
         log.info("[DEBUG-PERM] checkUserPermissionsReadOnly - DENYING ACCESS for entity: {}", obj.getMetaId());
         return false;
     }
