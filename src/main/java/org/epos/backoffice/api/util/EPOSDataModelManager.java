@@ -336,57 +336,52 @@ public class EPOSDataModelManager {
             return false;
         }
 
-        // First check if user is a member of any of the entity's groups with ACCEPTED status
-        for(String groupid : obj.getGroups()){
-            Map<String, Object> filters = new HashMap<>();
-            filters.put("group.id", groupid);
-            filters.put("authIdentifier.authIdentifier", user.getAuthIdentifier());
-
-            List<MetadataGroupUser> metadataGroupUserList = getDbaccess().getFromDBByUsingMultipleKeys(filters, MetadataGroupUser.class);
-
-            log.info("[DEBUG-PERM] checkUserPermissionsReadOnly - checking groupId: {}, found {} memberships", groupid, metadataGroupUserList.size());
-            for(MetadataGroupUser metadataGroupUser : metadataGroupUserList){
-                String status = metadataGroupUser.getRequestStatus();
-                log.info("[DEBUG-PERM] checkUserPermissionsReadOnly - membership: role={}, status={}", 
-                        metadataGroupUser.getRole(),
-                        status);
-                if(RequestStatusType.ACCEPTED.name().equals(status)){
-                    log.info("[DEBUG-PERM] checkUserPermissionsReadOnly - GRANTING ACCESS via group {} for entity: {}", groupid, obj.getMetaId());
-                    return true;
-                }
-            }
-        }
-
-        // Check if entity belongs to the "ALL" group - if so, any authenticated user with 
-        // at least one ACCEPTED group membership can read it (ALL is the public group)
+        // Get the ALL group info for later checks
         Group allGroup = UserGroupManagementAPI.retrieveGroupByName("ALL");
         String allGroupId = allGroup != null ? allGroup.getId() : null;
-        String allGroupName = allGroup != null ? allGroup.getName() : null;
         
-        // Check both by ID and by name to handle potential mismatches in how groups are stored
+        // Check if entity belongs to the "ALL" group (check both by ID and by name)
         boolean entityInAllGroup = false;
         if(allGroupId != null) {
             entityInAllGroup = obj.getGroups().contains(allGroupId);
         }
         // Also check by name in case groups are stored by name instead of ID
-        if(!entityInAllGroup && allGroupName != null) {
-            entityInAllGroup = obj.getGroups().contains(allGroupName);
-        }
-        // Also check for case-insensitive "ALL" in entity groups
         if(!entityInAllGroup) {
             entityInAllGroup = obj.getGroups().stream()
                     .anyMatch(g -> "ALL".equalsIgnoreCase(g));
         }
         
-        log.info("[DEBUG-PERM] checkUserPermissionsReadOnly - ALL group ID: {}, ALL group name: {}, entity groups: {}, entityInAllGroup: {}", 
-                allGroupId, allGroupName, obj.getGroups(), entityInAllGroup);
-        
+        log.info("[DEBUG-PERM] checkUserPermissionsReadOnly - ALL group ID: {}, entity groups: {}, entityInAllGroup: {}", 
+                allGroupId, obj.getGroups(), entityInAllGroup);
+
+        // If entity is in the ALL group, any user with at least one ACCEPTED membership can read it
         if(entityInAllGroup) {
-            // User must be a member of at least one group with ACCEPTED status to read public content
             boolean hasAccepted = userHasAnyAcceptedGroupMembership(user);
             log.info("[DEBUG-PERM] checkUserPermissionsReadOnly - entity is in ALL group, userHasAnyAcceptedGroupMembership: {}", hasAccepted);
             if(hasAccepted) {
                 log.info("[DEBUG-PERM] checkUserPermissionsReadOnly - GRANTING ACCESS via ALL group for entity: {}", obj.getMetaId());
+                return true;
+            }
+        }
+
+        // Get all user's group memberships with ACCEPTED status
+        List<MetadataGroupUser> userMemberships = getDbaccess().getOneFromDBBySpecificKeySimple(
+                "authIdentifier.authIdentifier", user.getAuthIdentifier(), MetadataGroupUser.class);
+        
+        // Build a set of group IDs where the user has ACCEPTED status
+        Set<String> userAcceptedGroupIds = new HashSet<>();
+        for(MetadataGroupUser membership : userMemberships) {
+            if(RequestStatusType.ACCEPTED.name().equals(membership.getRequestStatus())) {
+                userAcceptedGroupIds.add(membership.getGroup().getId());
+            }
+        }
+        
+        log.info("[DEBUG-PERM] checkUserPermissionsReadOnly - user's ACCEPTED group IDs: {}", userAcceptedGroupIds);
+
+        // Check if entity belongs to any of the user's ACCEPTED groups
+        for(String entityGroupId : obj.getGroups()){
+            if(userAcceptedGroupIds.contains(entityGroupId)) {
+                log.info("[DEBUG-PERM] checkUserPermissionsReadOnly - GRANTING ACCESS via group {} for entity: {}", entityGroupId, obj.getMetaId());
                 return true;
             }
         }
