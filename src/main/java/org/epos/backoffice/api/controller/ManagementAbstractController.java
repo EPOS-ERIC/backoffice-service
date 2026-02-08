@@ -83,12 +83,20 @@ public abstract class ManagementAbstractController<T> extends BasicController<T>
 		dbapi = AbstractAPI.retrieveAPI(EntityNames.valueOf(entityType.getSimpleName().toUpperCase()).name());
 
 		User user = getUserFromSession();
-		if(!entityType.equals(User.class)) {
-			ApiResponseMessage response = EPOSDataModelManager.createEposDataModelEntity(body,user,EntityNames.valueOf(entityType.getSimpleName().toUpperCase()),entityType);
-			if(response.getCode()==ApiResponseMessage.OK) return ResponseEntity.status(201).body(response.getEntity());
-			else return ResponseEntity.status(400).body(response.getMessage());
+		if (user == null) {
+			return ResponseEntity.status(401).body("Unauthorized: User not found in session.");
 		}
 
+		if(!entityType.equals(User.class)) {
+			ApiResponseMessage response = EPOSDataModelManager.createEposDataModelEntity(body,user,EntityNames.valueOf(entityType.getSimpleName().toUpperCase()),entityType);
+			if(response.getCode() == ApiResponseMessage.OK) {
+				return ResponseEntity.status(201).body(response.getEntity());
+			} else if(response.getCode() == ApiResponseMessage.UNAUTHORIZED) {
+				return ResponseEntity.status(403).body(response.getMessage());
+			} else {
+				return ResponseEntity.status(400).body(response.getMessage());
+			}
+		}
 
 		return ResponseEntity.status(400).body(null);
 	}
@@ -97,12 +105,20 @@ public abstract class ManagementAbstractController<T> extends BasicController<T>
 		dbapi = AbstractAPI.retrieveAPI(EntityNames.valueOf(entityType.getSimpleName().toUpperCase()).name());
 
 		User user = getUserFromSession();
-		if(!entityType.equals(User.class)) {
-			ApiResponseMessage response = EPOSDataModelManager.updateEposDataModelEntity(body,user,EntityNames.valueOf(entityType.getSimpleName().toUpperCase()),entityType);
-			if(response.getCode()==ApiResponseMessage.OK) return ResponseEntity.status(201).body(response.getEntity());
-			else return ResponseEntity.status(400).body(response.getMessage());
+		if (user == null) {
+			return ResponseEntity.status(401).body("Unauthorized: User not found in session.");
 		}
 
+		if(!entityType.equals(User.class)) {
+			ApiResponseMessage response = EPOSDataModelManager.updateEposDataModelEntity(body,user,EntityNames.valueOf(entityType.getSimpleName().toUpperCase()),entityType);
+			if(response.getCode() == ApiResponseMessage.OK) {
+				return ResponseEntity.status(201).body(response.getEntity());
+			} else if(response.getCode() == ApiResponseMessage.UNAUTHORIZED) {
+				return ResponseEntity.status(403).body(response.getMessage());
+			} else {
+				return ResponseEntity.status(400).body(response.getMessage());
+			}
+		}
 
 		return ResponseEntity.status(400).body(null);
 	}

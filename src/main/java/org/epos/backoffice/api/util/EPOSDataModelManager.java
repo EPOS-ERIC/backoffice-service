@@ -104,11 +104,18 @@ public class EPOSDataModelManager {
 
         EposDataModelDAO.getInstance().clearAllCaches();
 
+        AbstractAPI dbapi = AbstractAPI.retrieveAPI(entityNames.name());
+
+        // For create, first determine which groups the entity will belong to
+        Group allGroup = UserGroupManagementAPI.retrieveGroupByName("ALL");
+        if((obj.getGroups()==null || obj.getGroups().isEmpty()) && allGroup != null) {
+            obj.setGroups(List.of(allGroup.getId()));
+        }
+
+        // Now check if user has write permission for the target groups
         if(!checkUserPermissionsReadWrite(obj, user)) {
             return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "The user can't manage this action");
         }
-
-        AbstractAPI dbapi = AbstractAPI.retrieveAPI(entityNames.name());
 
         if(obj.getInstanceId() != null)
             obj.setInstanceChangedId(obj.getInstanceId());
@@ -116,11 +123,6 @@ public class EPOSDataModelManager {
         obj.setStatus(obj.getStatus()==null? StatusType.DRAFT : obj.getStatus());
         obj.setEditorId(user.getAuthIdentifier());
         obj.setFileProvenance("backoffice");
-
-        Group allGroup = UserGroupManagementAPI.retrieveGroupByName("ALL");
-        if((obj.getGroups()==null || obj.getGroups().isEmpty()) && allGroup != null) {
-            obj.setGroups(List.of(allGroup.getId()));
-        }
 
         LinkedEntity reference = dbapi.create(obj, null, null, null);
 
