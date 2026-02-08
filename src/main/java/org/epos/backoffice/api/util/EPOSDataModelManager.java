@@ -341,14 +341,14 @@ public class EPOSDataModelManager {
         Group allGroup = UserGroupManagementAPI.retrieveGroupByName("ALL");
         String allGroupId = allGroup != null ? allGroup.getId() : null;
         boolean entityInAllGroup = allGroupId != null && obj.getGroups().contains(allGroupId);
-        log.info("checkUserPermissionsReadOnly - ALL group ID: {}, entity groups: {}, entityInAllGroup: {}", 
+        log.debug("checkUserPermissionsReadOnly - ALL group ID: {}, entity groups: {}, entityInAllGroup: {}", 
                 allGroupId, obj.getGroups(), entityInAllGroup);
         if(entityInAllGroup) {
             // User must be a member of at least one group with ACCEPTED status to read public content
             boolean hasAccepted = userHasAnyAcceptedGroupMembership(user);
-            log.info("checkUserPermissionsReadOnly - entity is in ALL group, userHasAnyAcceptedGroupMembership: {}", hasAccepted);
+            log.debug("checkUserPermissionsReadOnly - entity is in ALL group, userHasAnyAcceptedGroupMembership: {}", hasAccepted);
             if(hasAccepted) {
-                log.info("checkUserPermissionsReadOnly - granting access via ALL group");
+                log.debug("checkUserPermissionsReadOnly - granting access via ALL group");
                 return true;
             }
         }
