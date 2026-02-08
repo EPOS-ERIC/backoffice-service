@@ -1,11 +1,11 @@
 package org.epos.backoffice.api.util;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
+import model.MetadataGroupUser;
+import model.RequestStatusType;
 import org.epos.eposdatamodel.DataProduct;
 import org.epos.eposdatamodel.Distribution;
 import org.epos.eposdatamodel.EPOSDataModelEntity;
@@ -26,6 +26,8 @@ import metadataapis.EntityNames;
 import model.RoleType;
 import model.StatusType;
 import usermanagementapis.UserGroupManagementAPI;
+
+import static abstractapis.AbstractRelationsAPI.getDbaccess;
 
 public class EPOSDataModelManager {
 
@@ -50,20 +52,29 @@ public class EPOSDataModelManager {
         List<EPOSDataModelEntity> list;
         if (meta_id.equals("all")) {
             list = dbapi.retrieveAll();
+            list = list.stream()
+                    .filter(elem -> elem.getMetaId().equals(meta_id))
+                    .filter(elem -> checkUserPermissionsReadOnly(elem, user))
+                    .collect(Collectors.toList());
         } else {
             if(instance_id.equals("all")) {
                 list = dbapi.retrieveAll();
                 list = list.stream()
                         .filter(elem -> elem.getMetaId().equals(meta_id))
+                        .filter(elem -> checkUserPermissionsReadOnly(elem, user))
                         .collect(Collectors.toList());
             } else {
                 list = new ArrayList<>();
                 EPOSDataModelEntity entity = (EPOSDataModelEntity) dbapi.retrieve(instance_id);
                 if(entity!=null) list.add(entity);
+                list = list.stream()
+                        .filter(elem -> elem.getMetaId().equals(meta_id))
+                        .filter(elem -> checkUserPermissionsReadOnly(elem, user))
+                        .collect(Collectors.toList());
             }
         }
 
-        List<String> userGroups = UserGroupManagementAPI.retrieveUserById(user.getAuthIdentifier()).getGroups().stream().map(UserGroup::getGroupId).collect(Collectors.toList());
+        /*List<String> userGroups = UserGroupManagementAPI.retrieveUserById(user.getAuthIdentifier()).getGroups().stream().map(UserGroup::getGroupId).collect(Collectors.toList());
 
         Group allGroup = UserGroupManagementAPI.retrieveGroupByName("ALL");
         if(userGroups.isEmpty() && allGroup != null) {
@@ -82,14 +93,18 @@ public class EPOSDataModelManager {
         if (revertedList.isEmpty())
             return new ApiResponseMessage(ApiResponseMessage.OK, new ArrayList<EPOSDataModelEntity>());
 
-        return new ApiResponseMessage(ApiResponseMessage.OK, revertedList);
+        return new ApiResponseMessage(ApiResponseMessage.OK, revertedList);*/
+        if (list.isEmpty())
+            return new ApiResponseMessage(ApiResponseMessage.OK, new ArrayList<EPOSDataModelEntity>());
+
+        return new ApiResponseMessage(ApiResponseMessage.OK, list);
     }
 
     public static ApiResponseMessage createEposDataModelEntity(EPOSDataModelEntity obj, User user, EntityNames entityNames, Class clazz) {
 
         EposDataModelDAO.getInstance().clearAllCaches();
 
-        if(!checkUserPermissions(obj, user)) {
+        if(!checkUserPermissionsReadWrite(obj, user)) {
             return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "The user can't manage this action");
         }
 
@@ -137,7 +152,7 @@ public class EPOSDataModelManager {
             return new ApiResponseMessage(ApiResponseMessage.ERROR, "Entity not found");
         }
 
-        if(!checkUserPermissions(existingEntity, user)) {
+        if(!checkUserPermissionsReadWrite(existingEntity, user)) {
             return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "The user can't manage this action");
         }
 
@@ -238,15 +253,47 @@ public class EPOSDataModelManager {
         }
     }
 
-    private static boolean checkUserPermissions(EPOSDataModelEntity obj, User user) {
+    private static boolean checkUserPermissionsReadWrite(EPOSDataModelEntity obj, User user) {
         if(user.getIsAdmin()) return true;
+
         if(obj.getGroups() != null && !obj.getGroups().isEmpty()){
             for(String groupid : obj.getGroups()){
-                for(UserGroup group1 : user.getGroups()){
-                    if(groupid.equals(group1.getGroupId())
-                            && (group1.getRole().equals(RoleType.ADMIN)
-                            || group1.getRole().equals(RoleType.REVIEWER)
-                            || group1.getRole().equals(RoleType.EDITOR))){
+
+                Map<String, Object> filters = new HashMap<>();
+                filters.put("group.id", groupid);
+                filters.put("authIdentifier.authIdentifier", user.getAuthIdentifier());
+
+                List<MetadataGroupUser> metadataGroupUserList = getDbaccess().getFromDBByUsingMultipleKeys(filters,MetadataGroupUser.class);
+
+                System.out.println("metadataGroupUserList RW: "+metadataGroupUserList);
+                if(!metadataGroupUserList.isEmpty()){
+                        if((metadataGroupUserList.get(0).getRole().equals(RoleType.ADMIN)
+                                || metadataGroupUserList.get(0).getRole().equals(RoleType.REVIEWER)
+                                || metadataGroupUserList.get(0).getRole().equals(RoleType.EDITOR))
+                            && metadataGroupUserList.get(0).getRequestStatus().equals(RequestStatusType.ACCEPTED)){
+                            return true;
+                        }
+                }
+            }
+            return false;
+        }
+        return true;
+    }
+
+    private static boolean checkUserPermissionsReadOnly(EPOSDataModelEntity obj, User user) {
+        if(user.getIsAdmin()) return true;
+
+        if(obj.getGroups() != null && !obj.getGroups().isEmpty()){
+            for(String groupid : obj.getGroups()){
+                Map<String, Object> filters = new HashMap<>();
+                filters.put("group.id", groupid);
+                filters.put("authIdentifier.authIdentifier", user.getAuthIdentifier());
+
+                List<MetadataGroupUser> metadataGroupUserList = getDbaccess().getFromDBByUsingMultipleKeys(filters,MetadataGroupUser.class);
+
+                System.out.println("metadataGroupUserList RO: "+metadataGroupUserList);
+                if(!metadataGroupUserList.isEmpty()){
+                    if(metadataGroupUserList.get(0).getRequestStatus().equals(RequestStatusType.ACCEPTED)){
                         return true;
                     }
                 }
