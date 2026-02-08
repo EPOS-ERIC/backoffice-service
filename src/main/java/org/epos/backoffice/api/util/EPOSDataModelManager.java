@@ -274,10 +274,12 @@ public class EPOSDataModelManager {
 
             log.debug("metadataGroupUserList RW: {}", metadataGroupUserList);
             for(MetadataGroupUser metadataGroupUser : metadataGroupUserList){
-                if((metadataGroupUser.getRole().equals(RoleType.ADMIN)
-                        || metadataGroupUser.getRole().equals(RoleType.REVIEWER)
-                        || metadataGroupUser.getRole().equals(RoleType.EDITOR))
-                    && metadataGroupUser.getRequestStatus().equals(RequestStatusType.ACCEPTED)){
+                String role = metadataGroupUser.getRole();
+                String status = metadataGroupUser.getRequestStatus();
+                if((RoleType.ADMIN.name().equals(role)
+                        || RoleType.REVIEWER.name().equals(role)
+                        || RoleType.EDITOR.name().equals(role))
+                    && RequestStatusType.ACCEPTED.name().equals(status)){
                     return true;
                 }
             }
@@ -288,8 +290,14 @@ public class EPOSDataModelManager {
     private static boolean checkUserPermissionsReadOnly(EPOSDataModelEntity obj, User user) {
         if(user.getIsAdmin()) return true;
 
+        log.debug("checkUserPermissionsReadOnly - entity metaId: {}, instanceId: {}, groups: {}", 
+                obj.getMetaId(), obj.getInstanceId(), obj.getGroups());
+        log.debug("checkUserPermissionsReadOnly - user: {}, userGroups: {}", 
+                user.getAuthIdentifier(), user.getGroups());
+
         // Entities without groups are only accessible to Admins
         if(obj.getGroups() == null || obj.getGroups().isEmpty()){
+            log.debug("checkUserPermissionsReadOnly - entity has no groups, returning false");
             return false;
         }
 
@@ -300,13 +308,20 @@ public class EPOSDataModelManager {
 
             List<MetadataGroupUser> metadataGroupUserList = getDbaccess().getFromDBByUsingMultipleKeys(filters,MetadataGroupUser.class);
 
-            log.debug("metadataGroupUserList RO: {}", metadataGroupUserList);
+            log.debug("checkUserPermissionsReadOnly - groupId: {}, metadataGroupUserList: {}", groupid, metadataGroupUserList);
             for(MetadataGroupUser metadataGroupUser : metadataGroupUserList){
-                if(metadataGroupUser.getRequestStatus().equals(RequestStatusType.ACCEPTED)){
+                String status = metadataGroupUser.getRequestStatus();
+                log.debug("checkUserPermissionsReadOnly - checking user {} with role {} and status {}", 
+                        metadataGroupUser.getAuthIdentifier().getAuthIdentifier(),
+                        metadataGroupUser.getRole(),
+                        status);
+                if(RequestStatusType.ACCEPTED.name().equals(status)){
+                    log.debug("checkUserPermissionsReadOnly - ACCEPTED, returning true");
                     return true;
                 }
             }
         }
+        log.debug("checkUserPermissionsReadOnly - no matching group membership found, returning false");
         return false;
     }
 
@@ -320,8 +335,10 @@ public class EPOSDataModelManager {
                 List<MetadataGroupUser> metadataGroupUserList = getDbaccess().getFromDBByUsingMultipleKeys(filters, MetadataGroupUser.class);
 
                 for(MetadataGroupUser metadataGroupUser : metadataGroupUserList){
-                    if((metadataGroupUser.getRole().equals(RoleType.ADMIN) || metadataGroupUser.getRole().equals(RoleType.REVIEWER))
-                        && metadataGroupUser.getRequestStatus().equals(RequestStatusType.ACCEPTED)){
+                    String role = metadataGroupUser.getRole();
+                    String status = metadataGroupUser.getRequestStatus();
+                    if((RoleType.ADMIN.name().equals(role) || RoleType.REVIEWER.name().equals(role))
+                        && RequestStatusType.ACCEPTED.name().equals(status)){
                         return true;
                     }
                 }
