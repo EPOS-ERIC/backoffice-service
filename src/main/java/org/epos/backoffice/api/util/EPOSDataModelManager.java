@@ -43,11 +43,13 @@ public class EPOSDataModelManager {
             instance_id = "all";
         }
 
+        /*
+        TODO: check if this is needed
         if((entityNames.equals(EntityNames.PERSON)
                 || entityNames.equals(EntityNames.ORGANIZATION)
                 || entityNames.equals(EntityNames.CONTACTPOINT)) && !user.getIsAdmin()){
             return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "A user which is not Admin can't access PERSON/ORGANIZATION/CONTACTPOINT entities due to privacy settings");
-        }
+        }*/
 
         List<EPOSDataModelEntity> list;
         if (meta_id.equals("all")) {
