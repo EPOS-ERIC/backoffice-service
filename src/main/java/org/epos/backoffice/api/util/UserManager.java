@@ -9,6 +9,7 @@ import model.RequestStatusType;
 import model.RoleType;
 import model.StatusType;
 import org.epos.eposdatamodel.User;
+import org.epos.eposdatamodel.UserGroup;
 import usermanagementapis.UserGroupManagementAPI;
 
 public class UserManager {
@@ -88,7 +89,17 @@ public class UserManager {
 	public static ApiResponseMessage updateUserToGroup(AddUserToGroupBean userGroup, User user) {
 		EposDataModelDAO.getInstance().clearAllCaches();
 
-		if(!user.getIsAdmin() && userGroup.getStatusType().equals("ACCEPTED")) return addUserToGroup(userGroup, user);
+
+		User userRetrieved = UserGroupManagementAPI.retrieveUserById(userGroup.getUserid());
+		if(userRetrieved==null) return new ApiResponseMessage(ApiResponseMessage.ERROR, "User not found");
+		boolean exists = false;
+		for(UserGroup userGroup1 : userRetrieved.getGroups()) {
+			if(userGroup1.getGroupId().equals(userGroup.getGroupid())) exists = true;
+		}
+
+		if(!exists) return addUserToGroup(userGroup, user);
+
+		if(!user.getIsAdmin() && userGroup.getStatusType().equals("ACCEPTED")) return new ApiResponseMessage(ApiResponseMessage.ERROR, "You can't update users to groups");
 
 		Boolean result = UserGroupManagementAPI.updateUserInGroup(
 				userGroup.getGroupid(),
