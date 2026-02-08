@@ -325,14 +325,14 @@ public class EPOSDataModelManager {
     private static boolean checkUserPermissionsReadOnly(EPOSDataModelEntity obj, User user) {
         if(user.getIsAdmin()) return true;
 
-        log.debug("checkUserPermissionsReadOnly - entity metaId: {}, instanceId: {}, groups: {}", 
+        log.info("[DEBUG-PERM] checkUserPermissionsReadOnly - entity metaId: {}, instanceId: {}, groups: {}", 
                 obj.getMetaId(), obj.getInstanceId(), obj.getGroups());
-        log.debug("checkUserPermissionsReadOnly - user: {}, userGroups: {}", 
+        log.info("[DEBUG-PERM] checkUserPermissionsReadOnly - user: {}, userGroups: {}", 
                 user.getAuthIdentifier(), user.getGroups());
 
         // Entities without groups are only accessible to Admins
         if(obj.getGroups() == null || obj.getGroups().isEmpty()){
-            log.debug("checkUserPermissionsReadOnly - entity has no groups, returning false");
+            log.info("[DEBUG-PERM] checkUserPermissionsReadOnly - entity has no groups, returning false");
             return false;
         }
 
@@ -341,14 +341,14 @@ public class EPOSDataModelManager {
         Group allGroup = UserGroupManagementAPI.retrieveGroupByName("ALL");
         String allGroupId = allGroup != null ? allGroup.getId() : null;
         boolean entityInAllGroup = allGroupId != null && obj.getGroups().contains(allGroupId);
-        log.debug("checkUserPermissionsReadOnly - ALL group ID: {}, entity groups: {}, entityInAllGroup: {}", 
+        log.info("[DEBUG-PERM] checkUserPermissionsReadOnly - ALL group ID: {}, entity groups: {}, entityInAllGroup: {}", 
                 allGroupId, obj.getGroups(), entityInAllGroup);
         if(entityInAllGroup) {
             // User must be a member of at least one group with ACCEPTED status to read public content
             boolean hasAccepted = userHasAnyAcceptedGroupMembership(user);
-            log.debug("checkUserPermissionsReadOnly - entity is in ALL group, userHasAnyAcceptedGroupMembership: {}", hasAccepted);
+            log.info("[DEBUG-PERM] checkUserPermissionsReadOnly - entity is in ALL group, userHasAnyAcceptedGroupMembership: {}", hasAccepted);
             if(hasAccepted) {
-                log.debug("checkUserPermissionsReadOnly - granting access via ALL group");
+                log.info("[DEBUG-PERM] checkUserPermissionsReadOnly - GRANTING ACCESS via ALL group for entity: {}", obj.getMetaId());
                 return true;
             }
         }
@@ -361,20 +361,19 @@ public class EPOSDataModelManager {
 
             List<MetadataGroupUser> metadataGroupUserList = getDbaccess().getFromDBByUsingMultipleKeys(filters,MetadataGroupUser.class);
 
-            log.debug("checkUserPermissionsReadOnly - groupId: {}, metadataGroupUserList: {}", groupid, metadataGroupUserList);
+            log.info("[DEBUG-PERM] checkUserPermissionsReadOnly - checking groupId: {}, found {} memberships", groupid, metadataGroupUserList.size());
             for(MetadataGroupUser metadataGroupUser : metadataGroupUserList){
                 String status = metadataGroupUser.getRequestStatus();
-                log.debug("checkUserPermissionsReadOnly - checking user {} with role {} and status {}", 
-                        metadataGroupUser.getAuthIdentifier().getAuthIdentifier(),
+                log.info("[DEBUG-PERM] checkUserPermissionsReadOnly - membership: role={}, status={}", 
                         metadataGroupUser.getRole(),
                         status);
                 if(RequestStatusType.ACCEPTED.name().equals(status)){
-                    log.debug("checkUserPermissionsReadOnly - ACCEPTED, returning true");
+                    log.info("[DEBUG-PERM] checkUserPermissionsReadOnly - GRANTING ACCESS via group {} for entity: {}", groupid, obj.getMetaId());
                     return true;
                 }
             }
         }
-        log.debug("checkUserPermissionsReadOnly - no matching group membership found, returning false");
+        log.info("[DEBUG-PERM] checkUserPermissionsReadOnly - DENYING ACCESS for entity: {}", obj.getMetaId());
         return false;
     }
 
