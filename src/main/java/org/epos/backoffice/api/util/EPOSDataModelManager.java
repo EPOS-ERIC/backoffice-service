@@ -424,8 +424,7 @@ public class EPOSDataModelManager {
         return writableGroups;
     }
 
-    /**
-public static ApiResponseMessage deleteEposDataModelEntity(String instance_id, User user, EntityNames entityNames, Class clazz) {
+    public static ApiResponseMessage deleteEposDataModelEntity(String instance_id, User user, EntityNames entityNames, Class clazz) {
         EposDataModelDAO.getInstance().clearAllCaches();
         AbstractAPI dbapi = AbstractAPI.retrieveAPI(entityNames.name());
         
