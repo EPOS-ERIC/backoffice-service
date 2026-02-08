@@ -260,51 +260,54 @@ public class EPOSDataModelManager {
     private static boolean checkUserPermissionsReadWrite(EPOSDataModelEntity obj, User user) {
         if(user.getIsAdmin()) return true;
 
-        if(obj.getGroups() != null && !obj.getGroups().isEmpty()){
-            for(String groupid : obj.getGroups()){
-
-                Map<String, Object> filters = new HashMap<>();
-                filters.put("group.id", groupid);
-                filters.put("authIdentifier.authIdentifier", user.getAuthIdentifier());
-
-                List<MetadataGroupUser> metadataGroupUserList = getDbaccess().getFromDBByUsingMultipleKeys(filters,MetadataGroupUser.class);
-
-                log.debug("metadataGroupUserList RW: {}", metadataGroupUserList);
-                for(MetadataGroupUser metadataGroupUser : metadataGroupUserList){
-                    if((metadataGroupUser.getRole().equals(RoleType.ADMIN)
-                            || metadataGroupUser.getRole().equals(RoleType.REVIEWER)
-                            || metadataGroupUser.getRole().equals(RoleType.EDITOR))
-                        && metadataGroupUser.getRequestStatus().equals(RequestStatusType.ACCEPTED)){
-                        return true;
-                    }
-                }
-            }
+        // Entities without groups are only accessible to Admins
+        if(obj.getGroups() == null || obj.getGroups().isEmpty()){
             return false;
         }
-        return true;
+
+        for(String groupid : obj.getGroups()){
+            Map<String, Object> filters = new HashMap<>();
+            filters.put("group.id", groupid);
+            filters.put("authIdentifier.authIdentifier", user.getAuthIdentifier());
+
+            List<MetadataGroupUser> metadataGroupUserList = getDbaccess().getFromDBByUsingMultipleKeys(filters,MetadataGroupUser.class);
+
+            log.debug("metadataGroupUserList RW: {}", metadataGroupUserList);
+            for(MetadataGroupUser metadataGroupUser : metadataGroupUserList){
+                if((metadataGroupUser.getRole().equals(RoleType.ADMIN)
+                        || metadataGroupUser.getRole().equals(RoleType.REVIEWER)
+                        || metadataGroupUser.getRole().equals(RoleType.EDITOR))
+                    && metadataGroupUser.getRequestStatus().equals(RequestStatusType.ACCEPTED)){
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private static boolean checkUserPermissionsReadOnly(EPOSDataModelEntity obj, User user) {
         if(user.getIsAdmin()) return true;
 
-        if(obj.getGroups() != null && !obj.getGroups().isEmpty()){
-            for(String groupid : obj.getGroups()){
-                Map<String, Object> filters = new HashMap<>();
-                filters.put("group.id", groupid);
-                filters.put("authIdentifier.authIdentifier", user.getAuthIdentifier());
-
-                List<MetadataGroupUser> metadataGroupUserList = getDbaccess().getFromDBByUsingMultipleKeys(filters,MetadataGroupUser.class);
-
-                log.debug("metadataGroupUserList RO: {}", metadataGroupUserList);
-                for(MetadataGroupUser metadataGroupUser : metadataGroupUserList){
-                    if(metadataGroupUser.getRequestStatus().equals(RequestStatusType.ACCEPTED)){
-                        return true;
-                    }
-                }
-            }
+        // Entities without groups are only accessible to Admins
+        if(obj.getGroups() == null || obj.getGroups().isEmpty()){
             return false;
         }
-        return true;
+
+        for(String groupid : obj.getGroups()){
+            Map<String, Object> filters = new HashMap<>();
+            filters.put("group.id", groupid);
+            filters.put("authIdentifier.authIdentifier", user.getAuthIdentifier());
+
+            List<MetadataGroupUser> metadataGroupUserList = getDbaccess().getFromDBByUsingMultipleKeys(filters,MetadataGroupUser.class);
+
+            log.debug("metadataGroupUserList RO: {}", metadataGroupUserList);
+            for(MetadataGroupUser metadataGroupUser : metadataGroupUserList){
+                if(metadataGroupUser.getRequestStatus().equals(RequestStatusType.ACCEPTED)){
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private static boolean hasReviewerRole(User user, EPOSDataModelEntity obj) {
