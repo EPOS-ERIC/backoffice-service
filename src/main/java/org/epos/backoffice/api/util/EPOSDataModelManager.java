@@ -106,19 +106,42 @@ public class EPOSDataModelManager {
 
         AbstractAPI dbapi = AbstractAPI.retrieveAPI(entityNames.name());
 
-        // For create, first determine which groups the entity will belong to
-        Group allGroup = UserGroupManagementAPI.retrieveGroupByName("ALL");
-        if((obj.getGroups()==null || obj.getGroups().isEmpty()) && allGroup != null) {
-            obj.setGroups(List.of(allGroup.getId()));
+        // If creating from an existing entity (e.g., draft from published), retrieve it first
+        EPOSDataModelEntity existingEntity = null;
+        if(obj.getInstanceId() != null) {
+            existingEntity = (EPOSDataModelEntity) dbapi.retrieve(obj.getInstanceId());
+            if(existingEntity != null) {
+                // Check permissions against the existing entity's groups
+                if(!checkUserPermissionsReadWrite(existingEntity, user)) {
+                    return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "The user can't manage this action");
+                }
+                // Inherit groups from existing entity if not specified
+                if(obj.getGroups() == null || obj.getGroups().isEmpty()) {
+                    obj.setGroups(existingEntity.getGroups());
+                }
+            }
+            obj.setInstanceChangedId(obj.getInstanceId());
+        }
+        
+        // For brand new entities (no existing entity), determine groups
+        if(existingEntity == null && (obj.getGroups() == null || obj.getGroups().isEmpty())) {
+            // User didn't specify groups - use the user's groups where they have write permission
+            List<String> userWritableGroups = getUserWritableGroups(user);
+            if(userWritableGroups.isEmpty()) {
+                // Fallback to ALL group if user has no specific groups
+                Group allGroup = UserGroupManagementAPI.retrieveGroupByName("ALL");
+                if(allGroup != null) {
+                    obj.setGroups(List.of(allGroup.getId()));
+                }
+            } else {
+                obj.setGroups(userWritableGroups);
+            }
         }
 
-        // Now check if user has write permission for the target groups
-        if(!checkUserPermissionsReadWrite(obj, user)) {
+        // For brand new entities, check permissions on the target groups
+        if(existingEntity == null && !checkUserPermissionsReadWrite(obj, user)) {
             return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "The user can't manage this action");
         }
-
-        if(obj.getInstanceId() != null)
-            obj.setInstanceChangedId(obj.getInstanceId());
 
         obj.setStatus(obj.getStatus()==null? StatusType.DRAFT : obj.getStatus());
         obj.setEditorId(user.getAuthIdentifier());
@@ -260,10 +283,16 @@ public class EPOSDataModelManager {
     }
 
     private static boolean checkUserPermissionsReadWrite(EPOSDataModelEntity obj, User user) {
+        log.debug("checkUserPermissionsReadWrite - entity metaId: {}, instanceId: {}, groups: {}", 
+                obj.getMetaId(), obj.getInstanceId(), obj.getGroups());
+        log.debug("checkUserPermissionsReadWrite - user: {}, isAdmin: {}", 
+                user.getAuthIdentifier(), user.getIsAdmin());
+        
         if(user.getIsAdmin()) return true;
 
         // Entities without groups are only accessible to Admins
         if(obj.getGroups() == null || obj.getGroups().isEmpty()){
+            log.debug("checkUserPermissionsReadWrite - entity has no groups, returning false");
             return false;
         }
 
@@ -274,18 +303,21 @@ public class EPOSDataModelManager {
 
             List<MetadataGroupUser> metadataGroupUserList = getDbaccess().getFromDBByUsingMultipleKeys(filters,MetadataGroupUser.class);
 
-            log.debug("metadataGroupUserList RW: {}", metadataGroupUserList);
+            log.debug("checkUserPermissionsReadWrite - groupId: {}, metadataGroupUserList: {}", groupid, metadataGroupUserList);
             for(MetadataGroupUser metadataGroupUser : metadataGroupUserList){
                 String role = metadataGroupUser.getRole();
                 String status = metadataGroupUser.getRequestStatus();
+                log.debug("checkUserPermissionsReadWrite - checking role: {}, status: {}", role, status);
                 if((RoleType.ADMIN.name().equals(role)
                         || RoleType.REVIEWER.name().equals(role)
                         || RoleType.EDITOR.name().equals(role))
                     && RequestStatusType.ACCEPTED.name().equals(status)){
+                    log.debug("checkUserPermissionsReadWrite - permission granted");
                     return true;
                 }
             }
         }
+        log.debug("checkUserPermissionsReadWrite - no matching group membership found, returning false");
         return false;
     }
 
@@ -347,6 +379,36 @@ public class EPOSDataModelManager {
             }
         }
         return false;
+    }
+
+    /**
+     * Returns a list of group IDs where the user has write permission (EDITOR, REVIEWER, or ADMIN role with ACCEPTED status).
+     */
+    private static List<String> getUserWritableGroups(User user) {
+        List<String> writableGroups = new ArrayList<>();
+        
+        if(user.getIsAdmin()) {
+            // Admins can write to all groups - but for entity creation, we still need at least one group
+            // Return empty to trigger fallback to ALL group
+            return writableGroups;
+        }
+        
+        // Query all group memberships for this user
+        List<MetadataGroupUser> metadataGroupUserList = getDbaccess().getOneFromDBBySpecificKeySimple(
+                "authIdentifier.authIdentifier", user.getAuthIdentifier(), MetadataGroupUser.class);
+        
+        for(MetadataGroupUser metadataGroupUser : metadataGroupUserList) {
+            String role = metadataGroupUser.getRole();
+            String status = metadataGroupUser.getRequestStatus();
+            if((RoleType.ADMIN.name().equals(role)
+                    || RoleType.REVIEWER.name().equals(role)
+                    || RoleType.EDITOR.name().equals(role))
+                && RequestStatusType.ACCEPTED.name().equals(status)){
+                writableGroups.add(metadataGroupUser.getGroup().getId());
+            }
+        }
+        
+        return writableGroups;
     }
 
     public static ApiResponseMessage deleteEposDataModelEntity(String instance_id, User user, EntityNames entityNames, Class clazz) {
