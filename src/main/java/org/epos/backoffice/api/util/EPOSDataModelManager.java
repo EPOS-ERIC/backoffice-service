@@ -127,8 +127,9 @@ public class EPOSDataModelManager {
         if(existingEntity == null && (obj.getGroups() == null || obj.getGroups().isEmpty())) {
             // User didn't specify groups - use the user's groups where they have write permission
             List<String> userWritableGroups = getUserWritableGroups(user);
+            
             if(userWritableGroups.isEmpty()) {
-                // Fallback to ALL group if user has no specific groups
+                // Fallback to ALL group for admins
                 Group allGroup = UserGroupManagementAPI.retrieveGroupByName("ALL");
                 if(allGroup != null) {
                     obj.setGroups(List.of(allGroup.getId()));
@@ -335,6 +336,18 @@ public class EPOSDataModelManager {
             return false;
         }
 
+        // Check if entity belongs to the "ALL" group - if so, any authenticated user with 
+        // at least one ACCEPTED group membership can read it (ALL is the public group)
+        Group allGroup = UserGroupManagementAPI.retrieveGroupByName("ALL");
+        if(allGroup != null && obj.getGroups().contains(allGroup.getId())) {
+            // User must be a member of at least one group with ACCEPTED status to read public content
+            if(userHasAnyAcceptedGroupMembership(user)) {
+                log.debug("checkUserPermissionsReadOnly - entity is in ALL group and user has accepted membership, returning true");
+                return true;
+            }
+        }
+
+        // Check if user is a member of any of the entity's groups
         for(String groupid : obj.getGroups()){
             Map<String, Object> filters = new HashMap<>();
             filters.put("group.id", groupid);
@@ -411,7 +424,8 @@ public class EPOSDataModelManager {
         return writableGroups;
     }
 
-    public static ApiResponseMessage deleteEposDataModelEntity(String instance_id, User user, EntityNames entityNames, Class clazz) {
+    /**
+public static ApiResponseMessage deleteEposDataModelEntity(String instance_id, User user, EntityNames entityNames, Class clazz) {
         EposDataModelDAO.getInstance().clearAllCaches();
         AbstractAPI dbapi = AbstractAPI.retrieveAPI(entityNames.name());
         
@@ -426,6 +440,22 @@ public class EPOSDataModelManager {
         
         dbapi.delete(instance_id);
         return new ApiResponseMessage(ApiResponseMessage.OK, "Entity deleted successfully");
+    }
+
+    /**
+     * Checks if user has at least one ACCEPTED group membership (any group, any role).
+     * This is used to verify the user is an authenticated member of the system.
+     */
+    private static boolean userHasAnyAcceptedGroupMembership(User user) {
+        List<MetadataGroupUser> metadataGroupUserList = getDbaccess().getOneFromDBBySpecificKeySimple(
+                "authIdentifier.authIdentifier", user.getAuthIdentifier(), MetadataGroupUser.class);
+        
+        for(MetadataGroupUser metadataGroupUser : metadataGroupUserList) {
+            if(RequestStatusType.ACCEPTED.name().equals(metadataGroupUser.getRequestStatus())) {
+                return true;
+            }
+        }
+        return false;
     }
 
 	private static void updatePluginsForDraftDistribution(LinkedEntity newDataProductLinkedEntity, DataProduct oldDataProduct) {
