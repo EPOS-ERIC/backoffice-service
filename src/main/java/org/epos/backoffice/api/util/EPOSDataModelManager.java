@@ -73,27 +73,7 @@ public class EPOSDataModelManager {
                 }
             }
         }
-
-        /*List<String> userGroups = UserGroupManagementAPI.retrieveUserById(user.getAuthIdentifier()).getGroups().stream().map(UserGroup::getGroupId).collect(Collectors.toList());
-
-        Group allGroup = UserGroupManagementAPI.retrieveGroupByName("ALL");
-        if(userGroups.isEmpty() && allGroup != null) {
-            userGroups.add(allGroup.getId());
-        }
-
-        List<EPOSDataModelEntity> revertedList = new ArrayList<>();
-        list.forEach(e -> {
-            if(UserGroupManagementAPI.checkIfMetaIdAndUserIdAreInSameGroup(e.getMetaId(), user.getAuthIdentifier())){
-
-                e.setGroups(UserGroupManagementAPI.retrieveShortGroupsFromMetaId(e.getMetaId()));
-                revertedList.add(0, e);
-            }
-        });
-
-        if (revertedList.isEmpty())
-            return new ApiResponseMessage(ApiResponseMessage.OK, new ArrayList<EPOSDataModelEntity>());
-
-        return new ApiResponseMessage(ApiResponseMessage.OK, revertedList);*/
+        
         if (list.isEmpty())
             return new ApiResponseMessage(ApiResponseMessage.OK, new ArrayList<EPOSDataModelEntity>());
 
@@ -325,43 +305,15 @@ public class EPOSDataModelManager {
     private static boolean checkUserPermissionsReadOnly(EPOSDataModelEntity obj, User user) {
         if(user.getIsAdmin()) return true;
 
-        log.info("[DEBUG-PERM] checkUserPermissionsReadOnly - entity metaId: {}, instanceId: {}, groups: {}", 
+        log.debug("checkUserPermissionsReadOnly - entity metaId: {}, instanceId: {}, groups: {}", 
                 obj.getMetaId(), obj.getInstanceId(), obj.getGroups());
-        log.info("[DEBUG-PERM] checkUserPermissionsReadOnly - user: {}, userGroups: {}", 
+        log.debug("checkUserPermissionsReadOnly - user: {}, userGroups: {}", 
                 user.getAuthIdentifier(), user.getGroups());
 
         // Entities without groups are only accessible to Admins
         if(obj.getGroups() == null || obj.getGroups().isEmpty()){
-            log.info("[DEBUG-PERM] checkUserPermissionsReadOnly - entity has no groups, returning false");
+            log.debug("checkUserPermissionsReadOnly - entity has no groups, returning false");
             return false;
-        }
-
-        // Get the ALL group info for later checks
-        Group allGroup = UserGroupManagementAPI.retrieveGroupByName("ALL");
-        String allGroupId = allGroup != null ? allGroup.getId() : null;
-        
-        // Check if entity belongs to the "ALL" group (check both by ID and by name)
-        boolean entityInAllGroup = false;
-        if(allGroupId != null) {
-            entityInAllGroup = obj.getGroups().contains(allGroupId);
-        }
-        // Also check by name in case groups are stored by name instead of ID
-        if(!entityInAllGroup) {
-            entityInAllGroup = obj.getGroups().stream()
-                    .anyMatch(g -> "ALL".equalsIgnoreCase(g));
-        }
-        
-        log.info("[DEBUG-PERM] checkUserPermissionsReadOnly - ALL group ID: {}, entity groups: {}, entityInAllGroup: {}", 
-                allGroupId, obj.getGroups(), entityInAllGroup);
-
-        // If entity is in the ALL group, any user with at least one ACCEPTED membership can read it
-        if(entityInAllGroup) {
-            boolean hasAccepted = userHasAnyAcceptedGroupMembership(user);
-            log.info("[DEBUG-PERM] checkUserPermissionsReadOnly - entity is in ALL group, userHasAnyAcceptedGroupMembership: {}", hasAccepted);
-            if(hasAccepted) {
-                log.info("[DEBUG-PERM] checkUserPermissionsReadOnly - GRANTING ACCESS via ALL group for entity: {}", obj.getMetaId());
-                return true;
-            }
         }
 
         // Get all user's group memberships with ACCEPTED status
@@ -376,17 +328,17 @@ public class EPOSDataModelManager {
             }
         }
         
-        log.info("[DEBUG-PERM] checkUserPermissionsReadOnly - user's ACCEPTED group IDs: {}", userAcceptedGroupIds);
+        log.debug("checkUserPermissionsReadOnly - user's ACCEPTED group IDs: {}", userAcceptedGroupIds);
 
         // Check if entity belongs to any of the user's ACCEPTED groups
         for(String entityGroupId : obj.getGroups()){
             if(userAcceptedGroupIds.contains(entityGroupId)) {
-                log.info("[DEBUG-PERM] checkUserPermissionsReadOnly - GRANTING ACCESS via group {} for entity: {}", entityGroupId, obj.getMetaId());
+                log.debug("checkUserPermissionsReadOnly - GRANTING ACCESS via group {} for entity: {}", entityGroupId, obj.getMetaId());
                 return true;
             }
         }
 
-        log.info("[DEBUG-PERM] checkUserPermissionsReadOnly - DENYING ACCESS for entity: {}", obj.getMetaId());
+        log.debug("checkUserPermissionsReadOnly - DENYING ACCESS for entity: {}", obj.getMetaId());
         return false;
     }
 
@@ -457,22 +409,6 @@ public class EPOSDataModelManager {
         
         dbapi.delete(instance_id);
         return new ApiResponseMessage(ApiResponseMessage.OK, "Entity deleted successfully");
-    }
-
-    /**
-     * Checks if user has at least one ACCEPTED group membership (any group, any role).
-     * This is used to verify the user is an authenticated member of the system.
-     */
-    private static boolean userHasAnyAcceptedGroupMembership(User user) {
-        List<MetadataGroupUser> metadataGroupUserList = getDbaccess().getOneFromDBBySpecificKeySimple(
-                "authIdentifier.authIdentifier", user.getAuthIdentifier(), MetadataGroupUser.class);
-        
-        for(MetadataGroupUser metadataGroupUser : metadataGroupUserList) {
-            if(RequestStatusType.ACCEPTED.name().equals(metadataGroupUser.getRequestStatus())) {
-                return true;
-            }
-        }
-        return false;
     }
 
 	private static void updatePluginsForDraftDistribution(LinkedEntity newDataProductLinkedEntity, DataProduct oldDataProduct) {
