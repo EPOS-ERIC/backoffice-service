@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.*;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
+import usermanagementapis.UserGroupManagementAPI;
 
 import java.net.URI;
 import java.time.LocalDateTime;
@@ -57,7 +58,7 @@ public class EmailWrapper {
         if (submitter.getGroups() != null && !submitter.getGroups().isEmpty()) {
             groupList = submitter.getGroups().stream()
                     .filter(group -> group != null && group.getGroupId() != null)
-                    .map(group -> group.getGroupId())
+                    .map(group -> UserGroupManagementAPI.retrieveGroupById(group.getGroupId()).getName())
                     .collect(Collectors.joining(", "));
             if (groupList.isBlank()) {
                 groupList = "N/A";

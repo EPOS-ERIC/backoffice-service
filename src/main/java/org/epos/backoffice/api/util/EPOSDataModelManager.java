@@ -38,7 +38,7 @@ public class EPOSDataModelManager {
 
         AbstractAPI dbapi = AbstractAPI.retrieveAPI(entityNames.name());
         if (meta_id == null)
-            return new ApiResponseMessage(ApiResponseMessage.ERROR, "The [meta_id] field can't be left blank");
+            return new ApiResponseMessage(ApiResponseMessage.ERROR, "{\"response\" : \"The [meta_id] field can't be left blank\"}");
         if(instance_id == null) {
             instance_id = "all";
         }
@@ -93,13 +93,19 @@ public class EPOSDataModelManager {
         if(obj.getInstanceId() != null) {
             existingEntity = (EPOSDataModelEntity) dbapi.retrieve(obj.getInstanceId());
             if(existingEntity != null) {
-                // Check permissions against the existing entity's groups
-                if(!checkUserPermissionsReadWrite(existingEntity, user)) {
-                    return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "The user can't manage this action");
+                // Check if user can READ the existing entity (to copy from it)
+                if(!checkUserPermissionsReadOnly(existingEntity, user)) {
+                    return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "{\"response\" : \"The user can't read the source entity\"}");
                 }
                 // Inherit groups from existing entity if not specified
                 if(obj.getGroups() == null || obj.getGroups().isEmpty()) {
                     obj.setGroups(existingEntity.getGroups());
+                }
+                // Set the target status for the new entity (default DRAFT)
+                obj.setStatus(obj.getStatus() == null ? StatusType.DRAFT : obj.getStatus());
+                // Check if user can CREATE the new entity with the target status
+                if(!checkUserPermissionsReadWrite(obj, user)) {
+                    return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "{\"response\" : \"The user can't create an entity with this status\"}");
                 }
             }
             obj.setInstanceChangedId(obj.getInstanceId());
@@ -122,11 +128,17 @@ public class EPOSDataModelManager {
         }
 
         // For brand new entities, check permissions on the target groups
-        if(existingEntity == null && !checkUserPermissionsReadWrite(obj, user)) {
-            return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "The user can't manage this action");
+        if(existingEntity == null) {
+            obj.setStatus(obj.getStatus() == null ? StatusType.DRAFT : obj.getStatus());
+            if(!checkUserPermissionsReadWrite(obj, user)) {
+                return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "{\"response\" : \"The user can't create an entity with this status\"}");
+            }
         }
 
-        obj.setStatus(obj.getStatus()==null? StatusType.DRAFT : obj.getStatus());
+        // Status already set above, but ensure it's set for all cases
+        if(obj.getStatus() == null) {
+            obj.setStatus(StatusType.DRAFT);
+        }
         obj.setEditorId(user.getAuthIdentifier());
         obj.setFileProvenance("backoffice");
 
@@ -152,16 +164,16 @@ public class EPOSDataModelManager {
         AbstractAPI dbapi = AbstractAPI.retrieveAPI(entityNames.name());
 
         if (obj.getInstanceId() == null) {
-            return new ApiResponseMessage(ApiResponseMessage.ERROR, "InstanceId required for update");
+            return new ApiResponseMessage(ApiResponseMessage.ERROR, "{\"response\" : \"InstanceId required for update\"}");
         }
 
         EPOSDataModelEntity existingEntity = (EPOSDataModelEntity) dbapi.retrieve(obj.getInstanceId());
         if(existingEntity == null) {
-            return new ApiResponseMessage(ApiResponseMessage.ERROR, "Entity not found");
+            return new ApiResponseMessage(ApiResponseMessage.ERROR, "{\"response\" : \"Entity not found\"}");
         }
 
         if(!checkUserPermissionsReadWrite(existingEntity, user)) {
-            return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "The user can't manage this action");
+            return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "{\"response\" : \"The user can't manage this action\"}");
         }
 
         StatusType currentStatus = existingEntity.getStatus();
@@ -229,7 +241,7 @@ public class EPOSDataModelManager {
         if (currentStatus == StatusType.DRAFT && newStatus == StatusType.SUBMITTED) {
             // Only the owner or admin can submit
             if (!user.getIsAdmin() && !user.getAuthIdentifier().equals(existingEntity.getEditorId())) {
-                return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "Only the DRAFT owner or Admin can submit.");
+                return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "{\"response\" : \"Only the DRAFT owner or Admin can submit.\"}");
             }
             LinkedEntity reference = dbapi.create(entityToSave, null, null, null);
 
@@ -243,7 +255,7 @@ public class EPOSDataModelManager {
         if (currentStatus == StatusType.SUBMITTED && newStatus == StatusType.PUBLISHED) {
             // Only admin or reviewer can publish
             if (!user.getIsAdmin() && !hasReviewerRole(user, existingEntity)) {
-                return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "Only Admin or Reviewer can publish.");
+                return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "{\"response\" : \"Only Admin or Reviewer can publish.\"}");
             }
             LinkedEntity reference = dbapi.create(entityToSave, null, null, null);
             archiveOldPublishedVersions(dbapi, reference.getMetaId(), reference.getInstanceId());
@@ -252,10 +264,10 @@ public class EPOSDataModelManager {
 
         // ARCHIVED -> any: Not allowed (ARCHIVED entities are read-only)
         if (currentStatus == StatusType.ARCHIVED) {
-            return new ApiResponseMessage(ApiResponseMessage.ERROR, "Cannot modify ARCHIVED entity. ARCHIVED entities are read-only.");
+            return new ApiResponseMessage(ApiResponseMessage.ERROR, "{\"response\" : \"Cannot modify ARCHIVED entity. ARCHIVED entities are read-only.\"}");
         }
 
-        return new ApiResponseMessage(ApiResponseMessage.ERROR, "Invalid status transition from " + currentStatus + " to " + newStatus);
+        return new ApiResponseMessage(ApiResponseMessage.ERROR, "{\"response\" : \"Invalid status transition from " + currentStatus + " to " + newStatus+"\"}");
     }
 
     private static void archiveOldPublishedVersions(AbstractAPI dbapi, String metaId, String currentInstanceId) {
