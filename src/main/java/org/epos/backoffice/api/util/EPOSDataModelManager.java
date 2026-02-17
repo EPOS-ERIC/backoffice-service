@@ -182,11 +182,13 @@ public class EPOSDataModelManager {
         EPOSDataModelEntity entityToSave = (obj.getUid() == null) ? existingEntity : obj;
 
         entityToSave.setStatus(newStatus);
-        entityToSave.setEditorId(user.getAuthIdentifier());
         entityToSave.setFileProvenance("backoffice");
 
         // DRAFT -> DRAFT: Check if same user or create new DRAFT
         if (currentStatus == StatusType.DRAFT && newStatus == StatusType.DRAFT) {
+
+            entityToSave.setEditorId(user.getAuthIdentifier());
+
             // If same user, modify existing DRAFT
             if (user.getIsAdmin() || user.getAuthIdentifier().equals(existingEntity.getEditorId())) {
                 LinkedEntity reference = dbapi.create(entityToSave, null, null, null);
@@ -226,6 +228,7 @@ public class EPOSDataModelManager {
             entityToSave.setMetaId(existingEntity.getMetaId());
             entityToSave.setStatus(StatusType.DRAFT);
             entityToSave.setInstanceChangedId(existingEntity.getInstanceId());
+            entityToSave.setEditorId(user.getAuthIdentifier());
 
             LinkedEntity reference = dbapi.create(entityToSave, null, null, null);
 
@@ -240,9 +243,9 @@ public class EPOSDataModelManager {
         // DRAFT -> SUBMITTED: Status change only
         if (currentStatus == StatusType.DRAFT && newStatus == StatusType.SUBMITTED) {
             // Only the owner or admin can submit
-            if (!user.getIsAdmin() && !user.getAuthIdentifier().equals(existingEntity.getEditorId())) {
-                return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "{\"response\" : \"Only the DRAFT owner or Admin can submit.\"}");
-            }
+            //if (!user.getIsAdmin() && !user.getAuthIdentifier().equals(existingEntity.getEditorId())) {
+            //    return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "{\"response\" : \"Only the DRAFT owner or Admin can submit.\"}");
+            //}
             LinkedEntity reference = dbapi.create(entityToSave, null, null, null);
 
             EPOSDataModelEntity entity = (EPOSDataModelEntity) dbapi.retrieve(reference.getInstanceId());
@@ -254,9 +257,9 @@ public class EPOSDataModelManager {
         // SUBMITTED -> PUBLISHED: Status change + archive old PUBLISHED versions
         if (currentStatus == StatusType.SUBMITTED && newStatus == StatusType.PUBLISHED) {
             // Only admin or reviewer can publish
-            if (!user.getIsAdmin() && !hasReviewerRole(user, existingEntity)) {
-                return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "{\"response\" : \"Only Admin or Reviewer can publish.\"}");
-            }
+            //if (!user.getIsAdmin() && !hasReviewerRole(user, existingEntity)) {
+            //    return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "{\"response\" : \"Only Admin or Reviewer can publish.\"}");
+            //}
             LinkedEntity reference = dbapi.create(entityToSave, null, null, null);
             archiveOldPublishedVersions(dbapi, reference.getMetaId(), reference.getInstanceId());
             return new ApiResponseMessage(ApiResponseMessage.OK, reference);
