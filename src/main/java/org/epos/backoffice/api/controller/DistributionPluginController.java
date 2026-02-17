@@ -120,7 +120,7 @@ public class DistributionPluginController extends MetadataAbstractController<Dis
 
         org.epos.eposdatamodel.User user = getUserFromSession();
         if (user == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("User session not found");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("{\"response\":\"User session not found\"}");
         }
 
         Distribution distribution = (Distribution) AbstractAPI.retrieveAPI(EntityNames.DISTRIBUTION.name())
@@ -152,11 +152,11 @@ public class DistributionPluginController extends MetadataAbstractController<Dis
             HttpEntity<ExternalEmailRequest> entity = new HttpEntity<>(externalRequest, headers);
 
             restTemplate.postForEntity(url, entity, Void.class);
-            return ResponseEntity.ok("Email sent successfully");
+            return ResponseEntity.ok("{ \"response\": \"Email sent successfully\"}");
         } catch (Exception e) {
             log.error("Error calling email-sender-service: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Error sending email: " + e.getMessage());
+                    .body("{ \"response\": \"error sending email: " + e.getMessage() + "\"}");
         }
     }
 
