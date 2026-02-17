@@ -52,11 +52,16 @@ public class EPOSDataModelManager {
         }*/
 
         List<EPOSDataModelEntity> list;
+        
+        // Pre-fetch user's group roles once for all permission checks (optimization)
+        // For backoffice admins, we pass null since they have full access
+        final Map<String, String> userGroupRoles = user.getIsAdmin() ? null : getUserAcceptedGroupRoles(user);
+        
         if (meta_id.equals("all")) {
             // Retrieve all entities, only filter by user permissions
             list = dbapi.retrieveAll();
             list = list.stream()
-                    .filter(elem -> checkUserPermissionsReadOnly(elem, user))
+                    .filter(elem -> checkUserPermissionsReadOnly(elem, user, userGroupRoles))
                     .collect(Collectors.toList());
         } else {
             if(instance_id.equals("all")) {
@@ -64,13 +69,13 @@ public class EPOSDataModelManager {
                 list = dbapi.retrieveAll();
                 list = list.stream()
                         .filter(elem -> elem.getMetaId().equals(meta_id))
-                        .filter(elem -> checkUserPermissionsReadOnly(elem, user))
+                        .filter(elem -> checkUserPermissionsReadOnly(elem, user, userGroupRoles))
                         .collect(Collectors.toList());
             } else {
                 // Retrieve a specific instance
                 list = new ArrayList<>();
                 EPOSDataModelEntity entity = (EPOSDataModelEntity) dbapi.retrieve(instance_id);
-                if(entity != null && entity.getMetaId().equals(meta_id) && checkUserPermissionsReadOnly(entity, user)) {
+                if(entity != null && entity.getMetaId().equals(meta_id) && checkUserPermissionsReadOnly(entity, user, userGroupRoles)) {
                     list.add(entity);
                 }
             }
@@ -87,6 +92,9 @@ public class EPOSDataModelManager {
         EposDataModelDAO.getInstance().clearAllCaches();
 
         AbstractAPI dbapi = AbstractAPI.retrieveAPI(entityNames.name());
+        
+        // Pre-fetch user's group roles once for all permission checks (optimization)
+        final Map<String, String> userGroupRoles = user.getIsAdmin() ? null : getUserAcceptedGroupRoles(user);
 
         // If creating from an existing entity (e.g., draft from published), retrieve it first
         EPOSDataModelEntity existingEntity = null;
@@ -94,7 +102,7 @@ public class EPOSDataModelManager {
             existingEntity = (EPOSDataModelEntity) dbapi.retrieve(obj.getInstanceId());
             if(existingEntity != null) {
                 // Check if user can READ the existing entity (to copy from it)
-                if(!checkUserPermissionsReadOnly(existingEntity, user)) {
+                if(!checkUserPermissionsReadOnly(existingEntity, user, userGroupRoles)) {
                     return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "{\"response\" : \"The user can't read the source entity\"}");
                 }
                 // Inherit groups from existing entity if not specified
@@ -104,7 +112,7 @@ public class EPOSDataModelManager {
                 // Set the target status for the new entity (default DRAFT)
                 obj.setStatus(obj.getStatus() == null ? StatusType.DRAFT : obj.getStatus());
                 // Check if user can CREATE the new entity with the target status
-                if(!checkUserPermissionsReadWrite(obj, user)) {
+                if(!checkUserPermissionsReadWrite(obj, user, userGroupRoles)) {
                     return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "{\"response\" : \"The user can't create an entity with this status\"}");
                 }
             }
@@ -114,7 +122,7 @@ public class EPOSDataModelManager {
         // For brand new entities (no existing entity), determine groups
         if(existingEntity == null && (obj.getGroups() == null || obj.getGroups().isEmpty())) {
             // User didn't specify groups - use the user's groups where they have write permission
-            List<String> userWritableGroups = getUserWritableGroups(user);
+            List<String> userWritableGroups = getUserWritableGroups(user, userGroupRoles);
             
             if(userWritableGroups.isEmpty()) {
                 // Fallback to ALL group for admins
@@ -130,7 +138,7 @@ public class EPOSDataModelManager {
         // For brand new entities, check permissions on the target groups
         if(existingEntity == null) {
             obj.setStatus(obj.getStatus() == null ? StatusType.DRAFT : obj.getStatus());
-            if(!checkUserPermissionsReadWrite(obj, user)) {
+            if(!checkUserPermissionsReadWrite(obj, user, userGroupRoles)) {
                 return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "{\"response\" : \"The user can't create an entity with this status\"}");
             }
         }
@@ -172,7 +180,10 @@ public class EPOSDataModelManager {
             return new ApiResponseMessage(ApiResponseMessage.ERROR, "{\"response\" : \"Entity not found\"}");
         }
 
-        if(!checkUserPermissionsReadWrite(existingEntity, user)) {
+        // Pre-fetch user's group roles once for permission check (optimization)
+        final Map<String, String> userGroupRoles = user.getIsAdmin() ? null : getUserAcceptedGroupRoles(user);
+
+        if(!checkUserPermissionsReadWrite(existingEntity, user, userGroupRoles)) {
             return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "{\"response\" : \"The user can't manage this action\"}");
         }
 
@@ -284,12 +295,64 @@ public class EPOSDataModelManager {
         }
     }
 
+    // ==================== PERMISSION HELPER METHODS ====================
+
+    /**
+     * Returns a map of groupId -> highest role for all ACCEPTED memberships of the user.
+     * Single DB query, O(1) lookup afterwards.
+     */
+    private static Map<String, String> getUserAcceptedGroupRoles(User user) {
+        Map<String, String> groupRoles = new HashMap<>();
+        
+        // Single DB query: get all memberships for this user
+        List<MetadataGroupUser> allMemberships = getDbaccess().getOneFromDBBySpecificKeySimple(
+                "authIdentifier.authIdentifier", user.getAuthIdentifier(), MetadataGroupUser.class);
+        
+        for (MetadataGroupUser membership : allMemberships) {
+            // Only consider ACCEPTED memberships
+            if (!RequestStatusType.ACCEPTED.name().equals(membership.getRequestStatus())) {
+                continue;
+            }
+            
+            String groupId = membership.getGroup().getId();
+            String role = membership.getRole();
+            
+            // Keep highest role per group (in case of duplicates)
+            String existingRole = groupRoles.get(groupId);
+            if (existingRole == null || isHigherRole(role, existingRole)) {
+                groupRoles.put(groupId, role);
+            }
+        }
+        
+        return groupRoles;
+    }
+
+    /**
+     * Compares role priority: ADMIN > REVIEWER > EDITOR > VIEWER
+     * @return true if newRole has higher priority than existingRole
+     */
+    private static boolean isHigherRole(String newRole, String existingRole) {
+        return getRolePriority(newRole) > getRolePriority(existingRole);
+    }
+
+    /**
+     * Returns the priority of a role. Higher number = higher priority.
+     */
+    private static int getRolePriority(String role) {
+        if (RoleType.ADMIN.name().equals(role)) return 4;
+        if (RoleType.REVIEWER.name().equals(role)) return 3;
+        if (RoleType.EDITOR.name().equals(role)) return 2;
+        if (RoleType.VIEWER.name().equals(role)) return 1;
+        return 0;
+    }
+
     /**
      * Returns the user's highest-privilege role in the entity's groups.
+     * Uses pre-fetched userGroupRoles map for O(1) lookups.
      * Role priority: ADMIN > REVIEWER > EDITOR > VIEWER
      * Returns null if user has no ACCEPTED membership in any of the entity's groups (external user).
      */
-    private static String getUserRoleInEntityGroups(EPOSDataModelEntity obj, User user) {
+    private static String getUserRoleInEntityGroups(EPOSDataModelEntity obj, Map<String, String> userGroupRoles) {
         if (obj.getGroups() == null || obj.getGroups().isEmpty()) {
             return null;
         }
@@ -297,37 +360,44 @@ public class EPOSDataModelManager {
         String highestRole = null;
 
         for (String groupId : obj.getGroups()) {
-            Map<String, Object> filters = new HashMap<>();
-            filters.put("group.id", groupId);
-            filters.put("authIdentifier.authIdentifier", user.getAuthIdentifier());
+            String role = userGroupRoles.get(groupId);
+            if (role == null) {
+                continue; // User not a member of this group
+            }
 
-            List<MetadataGroupUser> memberships = getDbaccess().getFromDBByUsingMultipleKeys(filters, MetadataGroupUser.class);
+            // Return immediately for ADMIN (highest priority)
+            if (RoleType.ADMIN.name().equals(role)) {
+                return role;
+            }
 
-            for (MetadataGroupUser membership : memberships) {
-                if (!RequestStatusType.ACCEPTED.name().equals(membership.getRequestStatus())) {
-                    continue;
-                }
-                String role = membership.getRole();
-
-                // Return immediately for ADMIN (highest priority)
-                if (RoleType.ADMIN.name().equals(role)) {
-                    return role;
-                }
-
-                // Update highestRole based on priority: REVIEWER > EDITOR > VIEWER
-                if (RoleType.REVIEWER.name().equals(role)) {
-                    highestRole = role;
-                } else if (RoleType.EDITOR.name().equals(role) && !RoleType.REVIEWER.name().equals(highestRole)) {
-                    highestRole = role;
-                } else if (RoleType.VIEWER.name().equals(role) && highestRole == null) {
-                    highestRole = role;
-                }
+            // Update highestRole based on priority
+            if (highestRole == null || isHigherRole(role, highestRole)) {
+                highestRole = role;
             }
         }
         return highestRole;
     }
 
+    /**
+     * Checks if a user can CREATE/MODIFY an entity. Fetches user roles from DB.
+     * For batch operations, use the overloaded version with pre-fetched userGroupRoles.
+     */
     private static boolean checkUserPermissionsReadWrite(EPOSDataModelEntity obj, User user) {
+        if (user.getIsAdmin()) {
+            // Early return for backoffice admin (no need to fetch roles)
+            if (obj.getStatus() == StatusType.ARCHIVED) {
+                return false;
+            }
+            return true;
+        }
+        return checkUserPermissionsReadWrite(obj, user, getUserAcceptedGroupRoles(user));
+    }
+
+    /**
+     * Checks if a user can CREATE/MODIFY an entity using pre-fetched user group roles.
+     * This is the optimized version for batch operations.
+     */
+    private static boolean checkUserPermissionsReadWrite(EPOSDataModelEntity obj, User user, Map<String, String> userGroupRoles) {
         log.debug("checkUserPermissionsReadWrite - entity metaId: {}, instanceId: {}, status: {}, groups: {}", 
                 obj.getMetaId(), obj.getInstanceId(), obj.getStatus(), obj.getGroups());
         log.debug("checkUserPermissionsReadWrite - user: {}, isAdmin: {}", 
@@ -362,8 +432,8 @@ public class EPOSDataModelManager {
             return false;
         }
 
-        // Get user's role in the entity's groups
-        String userRole = getUserRoleInEntityGroups(obj, user);
+        // Get user's role in the entity's groups using pre-fetched map
+        String userRole = getUserRoleInEntityGroups(obj, userGroupRoles);
         log.debug("checkUserPermissionsReadWrite - user role in entity groups: {}", userRole);
 
         // No membership in entity's groups = external user = no access
@@ -419,7 +489,23 @@ public class EPOSDataModelManager {
         }
     }
 
+    /**
+     * Checks if a user can VIEW an entity. Fetches user roles from DB.
+     * For batch operations, use the overloaded version with pre-fetched userGroupRoles.
+     */
     private static boolean checkUserPermissionsReadOnly(EPOSDataModelEntity obj, User user) {
+        if (user.getIsAdmin()) {
+            // Early return for backoffice admin (no need to fetch roles)
+            return true;
+        }
+        return checkUserPermissionsReadOnly(obj, user, getUserAcceptedGroupRoles(user));
+    }
+
+    /**
+     * Checks if a user can VIEW an entity using pre-fetched user group roles.
+     * This is the optimized version for batch operations.
+     */
+    private static boolean checkUserPermissionsReadOnly(EPOSDataModelEntity obj, User user, Map<String, String> userGroupRoles) {
         log.debug("checkUserPermissionsReadOnly - entity metaId: {}, instanceId: {}, status: {}, groups: {}", 
                 obj.getMetaId(), obj.getInstanceId(), obj.getStatus(), obj.getGroups());
         log.debug("checkUserPermissionsReadOnly - user: {}, isAdmin: {}", 
@@ -443,8 +529,8 @@ public class EPOSDataModelManager {
             status = StatusType.DRAFT;
         }
 
-        // Get user's role in the entity's groups
-        String userRole = getUserRoleInEntityGroups(obj, user);
+        // Get user's role in the entity's groups using pre-fetched map
+        String userRole = getUserRoleInEntityGroups(obj, userGroupRoles);
         log.debug("checkUserPermissionsReadOnly - user role in entity groups: {}", userRole);
 
         // No membership in entity's groups = external user = no access
@@ -537,8 +623,22 @@ public class EPOSDataModelManager {
 
     /**
      * Returns a list of group IDs where the user has write permission (EDITOR, REVIEWER, or ADMIN role with ACCEPTED status).
+     * Fetches user roles from DB.
      */
     private static List<String> getUserWritableGroups(User user) {
+        if(user.getIsAdmin()) {
+            // Admins can write to all groups - but for entity creation, we still need at least one group
+            // Return empty to trigger fallback to ALL group
+            return new ArrayList<>();
+        }
+        return getUserWritableGroups(user, getUserAcceptedGroupRoles(user));
+    }
+
+    /**
+     * Returns a list of group IDs where the user has write permission (EDITOR, REVIEWER, or ADMIN role with ACCEPTED status).
+     * Uses pre-fetched userGroupRoles map for efficiency.
+     */
+    private static List<String> getUserWritableGroups(User user, Map<String, String> userGroupRoles) {
         List<String> writableGroups = new ArrayList<>();
         
         if(user.getIsAdmin()) {
@@ -547,18 +647,17 @@ public class EPOSDataModelManager {
             return writableGroups;
         }
         
-        // Query all group memberships for this user
-        List<MetadataGroupUser> metadataGroupUserList = getDbaccess().getOneFromDBBySpecificKeySimple(
-                "authIdentifier.authIdentifier", user.getAuthIdentifier(), MetadataGroupUser.class);
+        if(userGroupRoles == null) {
+            return writableGroups;
+        }
         
-        for(MetadataGroupUser metadataGroupUser : metadataGroupUserList) {
-            String role = metadataGroupUser.getRole();
-            String status = metadataGroupUser.getRequestStatus();
-            if((RoleType.ADMIN.name().equals(role)
+        // Filter groups where user has write permission (EDITOR, REVIEWER, or ADMIN)
+        for(Map.Entry<String, String> entry : userGroupRoles.entrySet()) {
+            String role = entry.getValue();
+            if(RoleType.ADMIN.name().equals(role)
                     || RoleType.REVIEWER.name().equals(role)
-                    || RoleType.EDITOR.name().equals(role))
-                && RequestStatusType.ACCEPTED.name().equals(status)){
-                writableGroups.add(metadataGroupUser.getGroup().getId());
+                    || RoleType.EDITOR.name().equals(role)) {
+                writableGroups.add(entry.getKey());
             }
         }
         
