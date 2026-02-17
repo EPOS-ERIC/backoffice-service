@@ -73,9 +73,11 @@ public class EmailWrapper {
             }
         }
 
+        String className = edmentity.getClass().getSimpleName();
+
         return String.format(
                 "A new draft submission requires your review.\n\n"
-                        + "DataProduct Details:\n"
+                        + className + " Details:\n"
                         + "Title: %s\n"
                         + "UID: %s\n"
                         + "Meta ID: %s\n"
