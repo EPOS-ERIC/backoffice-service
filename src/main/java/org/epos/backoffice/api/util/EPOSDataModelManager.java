@@ -232,6 +232,10 @@ public class EPOSDataModelManager {
                 return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "Only the DRAFT owner or Admin can submit.");
             }
             LinkedEntity reference = dbapi.create(entityToSave, null, null, null);
+
+            EPOSDataModelEntity entity = (EPOSDataModelEntity) dbapi.retrieve(reference.getInstanceId());
+            EmailWrapper.wrapSubmitted(entity,user,entity.getMetaId(), entity.getInstanceId());
+
             return new ApiResponseMessage(ApiResponseMessage.OK, reference);
         }
 
@@ -265,83 +269,233 @@ public class EPOSDataModelManager {
         }
     }
 
+    /**
+     * Returns the user's highest-privilege role in the entity's groups.
+     * Role priority: ADMIN > REVIEWER > EDITOR > VIEWER
+     * Returns null if user has no ACCEPTED membership in any of the entity's groups (external user).
+     */
+    private static String getUserRoleInEntityGroups(EPOSDataModelEntity obj, User user) {
+        if (obj.getGroups() == null || obj.getGroups().isEmpty()) {
+            return null;
+        }
+
+        String highestRole = null;
+
+        for (String groupId : obj.getGroups()) {
+            Map<String, Object> filters = new HashMap<>();
+            filters.put("group.id", groupId);
+            filters.put("authIdentifier.authIdentifier", user.getAuthIdentifier());
+
+            List<MetadataGroupUser> memberships = getDbaccess().getFromDBByUsingMultipleKeys(filters, MetadataGroupUser.class);
+
+            for (MetadataGroupUser membership : memberships) {
+                if (!RequestStatusType.ACCEPTED.name().equals(membership.getRequestStatus())) {
+                    continue;
+                }
+                String role = membership.getRole();
+
+                // Return immediately for ADMIN (highest priority)
+                if (RoleType.ADMIN.name().equals(role)) {
+                    return role;
+                }
+
+                // Update highestRole based on priority: REVIEWER > EDITOR > VIEWER
+                if (RoleType.REVIEWER.name().equals(role)) {
+                    highestRole = role;
+                } else if (RoleType.EDITOR.name().equals(role) && !RoleType.REVIEWER.name().equals(highestRole)) {
+                    highestRole = role;
+                } else if (RoleType.VIEWER.name().equals(role) && highestRole == null) {
+                    highestRole = role;
+                }
+            }
+        }
+        return highestRole;
+    }
+
     private static boolean checkUserPermissionsReadWrite(EPOSDataModelEntity obj, User user) {
-        log.debug("checkUserPermissionsReadWrite - entity metaId: {}, instanceId: {}, groups: {}", 
-                obj.getMetaId(), obj.getInstanceId(), obj.getGroups());
+        log.debug("checkUserPermissionsReadWrite - entity metaId: {}, instanceId: {}, status: {}, groups: {}", 
+                obj.getMetaId(), obj.getInstanceId(), obj.getStatus(), obj.getGroups());
         log.debug("checkUserPermissionsReadWrite - user: {}, isAdmin: {}", 
                 user.getAuthIdentifier(), user.getIsAdmin());
-        
-        if(user.getIsAdmin()) return true;
 
-        // Entities without groups are only accessible to Admins
-        if(obj.getGroups() == null || obj.getGroups().isEmpty()){
+        // Backoffice admin has full access to everything (except creating ARCHIVED)
+        if (user.getIsAdmin()) {
+            // Even backoffice admins cannot create ARCHIVED entities directly
+            if (obj.getStatus() == StatusType.ARCHIVED) {
+                log.debug("checkUserPermissionsReadWrite - cannot create/modify ARCHIVED entities");
+                return false;
+            }
+            log.debug("checkUserPermissionsReadWrite - backoffice admin, granting access");
+            return true;
+        }
+
+        // Entities without groups are only accessible to backoffice admins
+        if (obj.getGroups() == null || obj.getGroups().isEmpty()) {
             log.debug("checkUserPermissionsReadWrite - entity has no groups, returning false");
             return false;
         }
 
-        for(String groupid : obj.getGroups()){
-            Map<String, Object> filters = new HashMap<>();
-            filters.put("group.id", groupid);
-            filters.put("authIdentifier.authIdentifier", user.getAuthIdentifier());
+        // Get entity status (default to DRAFT if not set)
+        StatusType status = obj.getStatus();
+        if (status == null) {
+            status = StatusType.DRAFT;
+        }
 
-            List<MetadataGroupUser> metadataGroupUserList = getDbaccess().getFromDBByUsingMultipleKeys(filters,MetadataGroupUser.class);
+        // No one can create ARCHIVED entities directly
+        if (status == StatusType.ARCHIVED) {
+            log.debug("checkUserPermissionsReadWrite - cannot create/modify ARCHIVED entities");
+            return false;
+        }
 
-            log.debug("checkUserPermissionsReadWrite - groupId: {}, metadataGroupUserList: {}", groupid, metadataGroupUserList);
-            for(MetadataGroupUser metadataGroupUser : metadataGroupUserList){
-                String role = metadataGroupUser.getRole();
-                String status = metadataGroupUser.getRequestStatus();
-                log.debug("checkUserPermissionsReadWrite - checking role: {}, status: {}", role, status);
-                if((RoleType.ADMIN.name().equals(role)
-                        || RoleType.REVIEWER.name().equals(role)
-                        || RoleType.EDITOR.name().equals(role))
-                    && RequestStatusType.ACCEPTED.name().equals(status)){
-                    log.debug("checkUserPermissionsReadWrite - permission granted");
+        // Get user's role in the entity's groups
+        String userRole = getUserRoleInEntityGroups(obj, user);
+        log.debug("checkUserPermissionsReadWrite - user role in entity groups: {}", userRole);
+
+        // No membership in entity's groups = external user = no access
+        if (userRole == null) {
+            log.debug("checkUserPermissionsReadWrite - user has no role in entity groups (external user), denying access");
+            return false;
+        }
+
+        // Group ADMIN has full access within their groups (except ARCHIVED handled above)
+        if (RoleType.ADMIN.name().equals(userRole)) {
+            log.debug("checkUserPermissionsReadWrite - group admin, granting access");
+            return true;
+        }
+
+        // Check if user is the owner (for "self" permissions)
+        boolean isOwner = user.getAuthIdentifier() != null && 
+                          user.getAuthIdentifier().equals(obj.getEditorId());
+        log.debug("checkUserPermissionsReadWrite - isOwner: {}", isOwner);
+
+        // Apply create/write permissions based on role and status
+        switch (status) {
+            case DRAFT:
+                // viewer: no, editor: all, reviewer: no
+                if (RoleType.EDITOR.name().equals(userRole)) {
+                    log.debug("checkUserPermissionsReadWrite - DRAFT, editor role, granting access");
                     return true;
                 }
-            }
+                log.debug("checkUserPermissionsReadWrite - DRAFT, role {} has no write access", userRole);
+                return false;
+
+            case SUBMITTED:
+                // viewer: no, editor: self, reviewer: no
+                if (RoleType.EDITOR.name().equals(userRole)) {
+                    log.debug("checkUserPermissionsReadWrite - SUBMITTED, editor role, access based on ownership: {}", isOwner);
+                    return isOwner;
+                }
+                log.debug("checkUserPermissionsReadWrite - SUBMITTED, role {} has no write access", userRole);
+                return false;
+
+            case PUBLISHED:
+            case DISCARDED:
+                // viewer: no, editor: no, reviewer: all
+                if (RoleType.REVIEWER.name().equals(userRole)) {
+                    log.debug("checkUserPermissionsReadWrite - {}, reviewer role, granting access", status);
+                    return true;
+                }
+                log.debug("checkUserPermissionsReadWrite - {}, role {} has no write access", status, userRole);
+                return false;
+
+            default:
+                log.debug("checkUserPermissionsReadWrite - unknown status {}, denying access", status);
+                return false;
         }
-        log.debug("checkUserPermissionsReadWrite - no matching group membership found, returning false");
-        return false;
     }
 
     private static boolean checkUserPermissionsReadOnly(EPOSDataModelEntity obj, User user) {
-        if(user.getIsAdmin()) return true;
+        log.debug("checkUserPermissionsReadOnly - entity metaId: {}, instanceId: {}, status: {}, groups: {}", 
+                obj.getMetaId(), obj.getInstanceId(), obj.getStatus(), obj.getGroups());
+        log.debug("checkUserPermissionsReadOnly - user: {}, isAdmin: {}", 
+                user.getAuthIdentifier(), user.getIsAdmin());
 
-        log.debug("checkUserPermissionsReadOnly - entity metaId: {}, instanceId: {}, groups: {}", 
-                obj.getMetaId(), obj.getInstanceId(), obj.getGroups());
-        log.debug("checkUserPermissionsReadOnly - user: {}, userGroups: {}", 
-                user.getAuthIdentifier(), user.getGroups());
+        // Backoffice admin has full access to everything
+        if (user.getIsAdmin()) {
+            log.debug("checkUserPermissionsReadOnly - backoffice admin, granting access");
+            return true;
+        }
 
-        // Entities without groups are only accessible to Admins
-        if(obj.getGroups() == null || obj.getGroups().isEmpty()){
+        // Entities without groups are only accessible to backoffice admins
+        if (obj.getGroups() == null || obj.getGroups().isEmpty()) {
             log.debug("checkUserPermissionsReadOnly - entity has no groups, returning false");
             return false;
         }
 
-        // Get all user's group memberships with ACCEPTED status
-        List<MetadataGroupUser> userMemberships = getDbaccess().getOneFromDBBySpecificKeySimple(
-                "authIdentifier.authIdentifier", user.getAuthIdentifier(), MetadataGroupUser.class);
-        
-        // Build a set of group IDs where the user has ACCEPTED status
-        Set<String> userAcceptedGroupIds = new HashSet<>();
-        for(MetadataGroupUser membership : userMemberships) {
-            if(RequestStatusType.ACCEPTED.name().equals(membership.getRequestStatus())) {
-                userAcceptedGroupIds.add(membership.getGroup().getId());
-            }
+        // Get entity status (default to DRAFT if not set)
+        StatusType status = obj.getStatus();
+        if (status == null) {
+            status = StatusType.DRAFT;
         }
-        
-        log.debug("checkUserPermissionsReadOnly - user's ACCEPTED group IDs: {}", userAcceptedGroupIds);
 
-        // Check if entity belongs to any of the user's ACCEPTED groups
-        for(String entityGroupId : obj.getGroups()){
-            if(userAcceptedGroupIds.contains(entityGroupId)) {
-                log.debug("checkUserPermissionsReadOnly - GRANTING ACCESS via group {} for entity: {}", entityGroupId, obj.getMetaId());
+        // Get user's role in the entity's groups
+        String userRole = getUserRoleInEntityGroups(obj, user);
+        log.debug("checkUserPermissionsReadOnly - user role in entity groups: {}", userRole);
+
+        // No membership in entity's groups = external user = no access
+        if (userRole == null) {
+            log.debug("checkUserPermissionsReadOnly - user has no role in entity groups (external user), denying access");
+            return false;
+        }
+
+        // Group ADMIN has full access within their groups
+        if (RoleType.ADMIN.name().equals(userRole)) {
+            log.debug("checkUserPermissionsReadOnly - group admin, granting access");
+            return true;
+        }
+
+        // Check if user is the owner (for "self" permissions)
+        boolean isOwner = user.getAuthIdentifier() != null && 
+                          user.getAuthIdentifier().equals(obj.getEditorId());
+        log.debug("checkUserPermissionsReadOnly - isOwner: {}", isOwner);
+
+        // Apply view permissions based on role and status
+        switch (status) {
+            case DRAFT:
+                // viewer: no, editor: self, reviewer: no
+                if (RoleType.EDITOR.name().equals(userRole)) {
+                    log.debug("checkUserPermissionsReadOnly - DRAFT, editor role, access based on ownership: {}", isOwner);
+                    return isOwner;
+                }
+                log.debug("checkUserPermissionsReadOnly - DRAFT, role {} has no access", userRole);
+                return false;
+
+            case SUBMITTED:
+                // viewer: no, editor: self, reviewer: all
+                if (RoleType.REVIEWER.name().equals(userRole)) {
+                    log.debug("checkUserPermissionsReadOnly - SUBMITTED, reviewer role, granting access");
+                    return true;
+                }
+                if (RoleType.EDITOR.name().equals(userRole)) {
+                    log.debug("checkUserPermissionsReadOnly - SUBMITTED, editor role, access based on ownership: {}", isOwner);
+                    return isOwner;
+                }
+                log.debug("checkUserPermissionsReadOnly - SUBMITTED, role {} has no access", userRole);
+                return false;
+
+            case PUBLISHED:
+            case ARCHIVED:
+                // viewer: all, editor: all, reviewer: all
+                log.debug("checkUserPermissionsReadOnly - {}, any role with membership can view, granting access", status);
                 return true;
-            }
-        }
 
-        log.debug("checkUserPermissionsReadOnly - DENYING ACCESS for entity: {}", obj.getMetaId());
-        return false;
+            case DISCARDED:
+                // viewer: no, editor: self, reviewer: all
+                if (RoleType.REVIEWER.name().equals(userRole)) {
+                    log.debug("checkUserPermissionsReadOnly - DISCARDED, reviewer role, granting access");
+                    return true;
+                }
+                if (RoleType.EDITOR.name().equals(userRole)) {
+                    log.debug("checkUserPermissionsReadOnly - DISCARDED, editor role, access based on ownership: {}", isOwner);
+                    return isOwner;
+                }
+                log.debug("checkUserPermissionsReadOnly - DISCARDED, role {} has no access", userRole);
+                return false;
+
+            default:
+                log.debug("checkUserPermissionsReadOnly - unknown status {}, denying access", status);
+                return false;
+        }
     }
 
     private static boolean hasReviewerRole(User user, EPOSDataModelEntity obj) {
