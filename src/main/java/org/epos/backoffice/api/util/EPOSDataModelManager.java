@@ -195,6 +195,13 @@ public class EPOSDataModelManager {
         entityToSave.setStatus(newStatus);
         entityToSave.setFileProvenance("backoffice");
 
+        if (currentStatus == StatusType.PUBLISHED && newStatus == StatusType.PUBLISHED
+                && (entityNames.equals(EntityNames.CATEGORYSCHEME) || entityNames.equals(EntityNames.CATEGORY)
+                || entityNames.equals(EntityNames.ORGANIZATION) || entityNames.equals(EntityNames.PERSON))) {
+            LinkedEntity reference = dbapi.create(entityToSave, null, null, null);
+            return new ApiResponseMessage(ApiResponseMessage.OK, reference);
+        }
+
         // DRAFT -> DRAFT: Check if same user or create new DRAFT
         if (currentStatus == StatusType.DRAFT && newStatus == StatusType.DRAFT) {
 
