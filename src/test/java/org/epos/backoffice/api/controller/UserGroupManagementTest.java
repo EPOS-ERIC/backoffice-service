@@ -3,7 +3,9 @@ package org.epos.backoffice.api.controller;
 import metadataapis.EntityNames;
 import model.RequestStatusType;
 import model.RoleType;
+import model.StatusType;
 import org.epos.backoffice.api.util.*;
+import org.epos.eposdatamodel.DataProduct;
 import org.epos.eposdatamodel.Group;
 import org.epos.eposdatamodel.Identifier;
 import org.epos.eposdatamodel.LinkedEntity;
@@ -13,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import usermanagementapis.UserGroupManagementAPI;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -242,6 +245,87 @@ public class UserGroupManagementTest extends TestcontainersLifecycle {
 
     @Test
     @Order(9)
+    public void testRemoveEditorUserFromGroupWithDraftDataProduct() {
+        // This test reproduces the exact scenario:
+        // 1. User is EDITOR with ACCEPTED status in a group
+        // 2. User creates a DRAFT DataProduct in that group
+        // 3. Admin tries to remove the user from the group
+        // Expected: Should succeed (or return meaningful error)
+        
+        // Ensure we have an admin user (if previous tests didn't run)
+        if (user == null) {
+            user = new User("testid", "familyname", "givenname", "email@email.email", true);
+            UserManager.createUser(user, user);
+        }
+        
+        // Create a new group for this test
+        Group groupWithDraft = new Group(UUID.randomUUID().toString(), "Group With Draft DataProduct", "Test group");
+        GroupManager.createGroup(groupWithDraft, user);
+        
+        // Create a non-admin user to be the editor
+        User editorUser = new User("editor-user-id", "Editor", "User", "editor@email.email", false);
+        UserManager.createUser(editorUser, user);
+        
+        // Add the editor user to the group as EDITOR with ACCEPTED status
+        AddUserToGroupBean addUserToGroupBean = new AddUserToGroupBean();
+        addUserToGroupBean.setGroupid(groupWithDraft.getId());
+        addUserToGroupBean.setUserid(editorUser.getAuthIdentifier());
+        addUserToGroupBean.setRole(RoleType.EDITOR.toString());
+        addUserToGroupBean.setStatusType(RequestStatusType.ACCEPTED.toString());
+        UserManager.addUserToGroup(addUserToGroupBean, user);
+        
+        // Create a DRAFT DataProduct with the editor user as the creator/editor
+        DataProduct dataProduct = new DataProduct();
+        dataProduct.setInstanceId(UUID.randomUUID().toString());
+        dataProduct.setMetaId(UUID.randomUUID().toString());
+        dataProduct.setUid(UUID.randomUUID().toString());
+        dataProduct.setTitle(List.of("Test Draft DataProduct"));
+        dataProduct.setDescription(List.of("Test Description"));
+        dataProduct.setStatus(StatusType.DRAFT);
+        dataProduct.setGroups(List.of(groupWithDraft.getId()));
+        
+        // Create the DataProduct as the editor user (not admin)
+        ApiResponseMessage createResponse = EPOSDataModelManager.createEposDataModelEntity(
+            dataProduct, editorUser, EntityNames.DATAPRODUCT, DataProduct.class);
+        System.out.println("Create DataProduct response: " + createResponse);
+        
+        LinkedEntity dataProductLe = createResponse.getEntity();
+        assertNotNull(dataProductLe, "DataProduct should be created successfully");
+        
+        // Verify setup
+        Group retrieveGroupBefore = GroupManager.getGroup(groupWithDraft.getId(), user, false).getListOfGroups().get(0);
+        System.out.println("Before removal - Group users: " + retrieveGroupBefore.getUsers());
+        System.out.println("Before removal - Group entities: " + retrieveGroupBefore.getEntities());
+        
+        assertEquals(1, retrieveGroupBefore.getUsers().size(), "Group should have 1 user (editor) before removal");
+        assertTrue(retrieveGroupBefore.getEntities().size() >= 1, "Group should have at least 1 entity (DataProduct) before removal");
+        
+        // Now try to remove the editor user from the group (admin doing the removal)
+        RemoveUserFromGroupBean removeUserFromGroupBean = new RemoveUserFromGroupBean();
+        removeUserFromGroupBean.setGroupid(groupWithDraft.getId());
+        removeUserFromGroupBean.setUserid(editorUser.getAuthIdentifier());
+        
+        var response = UserManager.removeUserFromGroup(removeUserFromGroupBean, user);
+        System.out.println("Remove editor from group with DRAFT DataProduct - Response: " + response);
+        
+        // Verify the result - this is the key assertion!
+        assertEquals(ApiResponseMessage.OK, response.getCode(), 
+            "Should be able to remove editor user from group even when they have DRAFT entities. Got: " + response.getMessage());
+        
+        // Verify the user is no longer in the group
+        Group retrieveGroupAfter = GroupManager.getGroup(groupWithDraft.getId(), user, false).getListOfGroups().get(0);
+        System.out.println("After removal - Group users: " + retrieveGroupAfter.getUsers());
+        System.out.println("After removal - Group entities: " + retrieveGroupAfter.getEntities());
+        
+        assertEquals(0, retrieveGroupAfter.getUsers().size(), "Group should have 0 users after removal");
+        
+        // Cleanup
+        UserManager.deleteUser(editorUser.getAuthIdentifier(), user);
+        GroupManager.deleteGroup(groupWithDraft.getId(), user);
+    }
+
+    @Test
+    @Order(10)
     public void testDeleteUser() {
         UserManager.deleteUser(user.getAuthIdentifier(), user);
 
@@ -250,7 +334,7 @@ public class UserGroupManagementTest extends TestcontainersLifecycle {
     }
 
     @Test
-    @Order(10)
+    @Order(11)
     public void testDeleteGroup() {
 
         GroupManager.deleteGroup(group.getId(), user);
@@ -260,7 +344,7 @@ public class UserGroupManagementTest extends TestcontainersLifecycle {
 
 
     @Test
-    @Order(11)
+    @Order(12)
     public void testCreateGroupWithoutName() {
         Group group = new Group(UUID.randomUUID().toString(), null, "Test Decription");
         GroupManager.createGroup(group, user);
