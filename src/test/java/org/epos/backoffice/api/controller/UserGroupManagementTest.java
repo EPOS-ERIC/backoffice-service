@@ -1,11 +1,12 @@
 package org.epos.backoffice.api.controller;
 
+import metadataapis.EntityNames;
 import model.RequestStatusType;
 import model.RoleType;
-import org.epos.backoffice.api.util.AddUserToGroupBean;
-import org.epos.backoffice.api.util.GroupManager;
-import org.epos.backoffice.api.util.UserManager;
+import org.epos.backoffice.api.util.*;
 import org.epos.eposdatamodel.Group;
+import org.epos.eposdatamodel.Identifier;
+import org.epos.eposdatamodel.LinkedEntity;
 import org.epos.eposdatamodel.User;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
@@ -138,6 +139,109 @@ public class UserGroupManagementTest extends TestcontainersLifecycle {
 
     @Test
     @Order(7)
+    public void testRemoveUserFromGroup() {
+        // First, ensure user is in the group (from previous test)
+        User retrieveUserBefore = UserManager.getUser(user.getAuthIdentifier(), user, true).getListOfUsers().get(0);
+        Group retrieveGroupBefore = GroupManager.getGroup(group.getId(), user, false).getListOfGroups().get(0);
+        
+        System.out.println("Before removal - User groups: " + retrieveUserBefore.getGroups());
+        System.out.println("Before removal - Group users: " + retrieveGroupBefore.getUsers());
+        
+        // Verify user is in the group before removal
+        assertEquals(1, retrieveUserBefore.getGroups().size(), "User should be in 1 group before removal");
+        assertEquals(1, retrieveGroupBefore.getUsers().size(), "Group should have 1 user before removal");
+        
+        // Remove user from group
+        RemoveUserFromGroupBean removeUserFromGroupBean = new RemoveUserFromGroupBean();
+        removeUserFromGroupBean.setGroupid(group.getId());
+        removeUserFromGroupBean.setUserid(user.getAuthIdentifier());
+        
+        var response = UserManager.removeUserFromGroup(removeUserFromGroupBean, user);
+        System.out.println("Remove response: " + response);
+        
+        // Verify the user is no longer in the group
+        User retrieveUserAfter = UserManager.getUser(user.getAuthIdentifier(), user, true).getListOfUsers().get(0);
+        Group retrieveGroupAfter = GroupManager.getGroup(group.getId(), user, false).getListOfGroups().get(0);
+        
+        System.out.println("After removal - User groups: " + retrieveUserAfter.getGroups());
+        System.out.println("After removal - Group users: " + retrieveGroupAfter.getUsers());
+        
+        assertAll(
+                () -> assertNotNull(retrieveUserAfter),
+                () -> assertEquals(0, retrieveUserAfter.getGroups().size(), "User should have 0 groups after removal"),
+                () -> assertNotNull(retrieveGroupAfter),
+                () -> assertEquals(0, retrieveGroupAfter.getUsers().size(), "Group should have 0 users after removal")
+        );
+    }
+
+    @Test
+    @Order(8)
+    public void testRemoveUserFromGroupWithEntity() {
+        // Create a new group for this test
+        Group groupWithEntity = new Group(UUID.randomUUID().toString(), "Group With Entity", "Test group with entity");
+        GroupManager.createGroup(groupWithEntity, user);
+        
+        // Add user to the group as EDITOR
+        AddUserToGroupBean addUserToGroupBean = new AddUserToGroupBean();
+        addUserToGroupBean.setGroupid(groupWithEntity.getId());
+        addUserToGroupBean.setUserid(user.getAuthIdentifier());
+        addUserToGroupBean.setRole(RoleType.EDITOR.toString());
+        addUserToGroupBean.setStatusType(RequestStatusType.ACCEPTED.toString());
+        UserManager.addUserToGroup(addUserToGroupBean, user);
+        
+        // Create an entity (Identifier) and add it to the group
+        Identifier identifier = new Identifier();
+        identifier.setInstanceId(UUID.randomUUID().toString());
+        identifier.setMetaId(UUID.randomUUID().toString());
+        identifier.setUid(UUID.randomUUID().toString());
+        identifier.setType("TYPE");
+        identifier.setIdentifier("012345678900");
+        
+        LinkedEntity identifierLe = EPOSDataModelManager.createEposDataModelEntity(
+            identifier, user, EntityNames.IDENTIFIER, Identifier.class).getEntity();
+        
+        // Add the entity to the group
+        AddEntityToGroupBean addEntityToGroupBean = new AddEntityToGroupBean();
+        addEntityToGroupBean.setGroupid(groupWithEntity.getId());
+        addEntityToGroupBean.setMetaid(identifierLe.getMetaId());
+        GroupManager.addEntityToGroup(addEntityToGroupBean, user);
+        
+        // Verify setup: user is in group and group has entity
+        Group retrieveGroupBefore = GroupManager.getGroup(groupWithEntity.getId(), user, false).getListOfGroups().get(0);
+        System.out.println("Before removal - Group users: " + retrieveGroupBefore.getUsers());
+        System.out.println("Before removal - Group entities: " + retrieveGroupBefore.getEntities());
+        
+        assertEquals(1, retrieveGroupBefore.getUsers().size(), "Group should have 1 user before removal");
+        assertEquals(1, retrieveGroupBefore.getEntities().size(), "Group should have 1 entity before removal");
+        
+        // Now try to remove user from the group (this is where the issue should occur)
+        RemoveUserFromGroupBean removeUserFromGroupBean = new RemoveUserFromGroupBean();
+        removeUserFromGroupBean.setGroupid(groupWithEntity.getId());
+        removeUserFromGroupBean.setUserid(user.getAuthIdentifier());
+        
+        var response = UserManager.removeUserFromGroup(removeUserFromGroupBean, user);
+        System.out.println("Remove user from group with entity - Response: " + response);
+        
+        // Verify the result
+        assertEquals(ApiResponseMessage.OK, response.getCode(), 
+            "Should be able to remove user from group even when group has entities. Got: " + response.getMessage());
+        
+        // Verify the user is no longer in the group
+        Group retrieveGroupAfter = GroupManager.getGroup(groupWithEntity.getId(), user, false).getListOfGroups().get(0);
+        System.out.println("After removal - Group users: " + retrieveGroupAfter.getUsers());
+        System.out.println("After removal - Group entities: " + retrieveGroupAfter.getEntities());
+        
+        assertAll(
+            () -> assertEquals(0, retrieveGroupAfter.getUsers().size(), "Group should have 0 users after removal"),
+            () -> assertEquals(1, retrieveGroupAfter.getEntities().size(), "Group should still have 1 entity after user removal")
+        );
+        
+        // Cleanup: delete the group
+        GroupManager.deleteGroup(groupWithEntity.getId(), user);
+    }
+
+    @Test
+    @Order(9)
     public void testDeleteUser() {
         UserManager.deleteUser(user.getAuthIdentifier(), user);
 
@@ -146,7 +250,7 @@ public class UserGroupManagementTest extends TestcontainersLifecycle {
     }
 
     @Test
-    @Order(8)
+    @Order(10)
     public void testDeleteGroup() {
 
         GroupManager.deleteGroup(group.getId(), user);
@@ -156,7 +260,7 @@ public class UserGroupManagementTest extends TestcontainersLifecycle {
 
 
     @Test
-    @Order(9)
+    @Order(11)
     public void testCreateGroupWithoutName() {
         Group group = new Group(UUID.randomUUID().toString(), null, "Test Decription");
         GroupManager.createGroup(group, user);

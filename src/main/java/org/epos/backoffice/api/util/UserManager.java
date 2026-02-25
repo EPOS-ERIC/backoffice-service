@@ -115,13 +115,14 @@ public class UserManager {
 
 
 	public static ApiResponseMessage removeUserFromGroup(RemoveUserFromGroupBean removeUserFromGroupBean, User user) {
-		EposDataModelDAO.getInstance().clearAllCaches();
-
 		if(!user.getIsAdmin()) return new ApiResponseMessage(ApiResponseMessage.ERROR, "You can't remove users from groups");
 
 		Boolean result = UserGroupManagementAPI.removeUserFromGroup(
 				removeUserFromGroupBean.getGroupid(),
 				removeUserFromGroupBean.getUserid());
+
+		// Clear caches AFTER the operation to ensure fresh data on subsequent reads
+		EposDataModelDAO.getInstance().clearAllCaches();
 
 		if(result!=null && result)
 			return new ApiResponseMessage(ApiResponseMessage.OK, "User removed successfully from group");
