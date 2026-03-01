@@ -326,6 +326,100 @@ public class UserGroupManagementTest extends TestcontainersLifecycle {
 
     @Test
     @Order(10)
+    public void testRemoveEditorUserFromGroupWhenUserHasEntityInSameGroup() {
+        // This test verifies the scenario:
+        // 1. User is EDITOR with ACCEPTED status in a group
+        // 2. User owns/created an entity that is associated with the same group
+        // 3. Admin tries to remove the user from the group
+        // Expected: Should succeed - the user should be removed from the group
+        
+        // Ensure we have an admin user
+        if (user == null) {
+            user = new User("testid", "familyname", "givenname", "email@email.email", true);
+            UserManager.createUser(user, user);
+        }
+        
+        // Create a new group for this test
+        Group testGroup = new Group(UUID.randomUUID().toString(), "Group For Editor Entity Test", "Test group for editor with entity");
+        GroupManager.createGroup(testGroup, user);
+        
+        // Create a non-admin user to be the editor
+        User editorUser = new User("editor-with-entity-id", "EditorWithEntity", "User", "editor-entity@email.email", false);
+        UserManager.createUser(editorUser, user);
+        
+        // Add the editor user to the group as EDITOR with ACCEPTED status
+        AddUserToGroupBean addUserToGroupBean = new AddUserToGroupBean();
+        addUserToGroupBean.setGroupid(testGroup.getId());
+        addUserToGroupBean.setUserid(editorUser.getAuthIdentifier());
+        addUserToGroupBean.setRole(RoleType.EDITOR.toString());
+        addUserToGroupBean.setStatusType(RequestStatusType.ACCEPTED.toString());
+        UserManager.addUserToGroup(addUserToGroupBean, user);
+        
+        // Create an entity (Identifier) owned by the editor user
+        Identifier identifier = new Identifier();
+        identifier.setInstanceId(UUID.randomUUID().toString());
+        identifier.setMetaId(UUID.randomUUID().toString());
+        identifier.setUid(UUID.randomUUID().toString());
+        identifier.setType("DOI");
+        identifier.setIdentifier("10.1234/editor-owned-entity");
+        identifier.setStatus(StatusType.DRAFT);
+        identifier.setGroups(List.of(testGroup.getId()));
+        
+        // Create the entity as the editor user (making them the owner)
+        ApiResponseMessage createResponse = EPOSDataModelManager.createEposDataModelEntity(
+            identifier, editorUser, EntityNames.IDENTIFIER, Identifier.class);
+        System.out.println("Create Identifier response: " + createResponse);
+        
+        LinkedEntity identifierLe = createResponse.getEntity();
+        assertNotNull(identifierLe, "Identifier should be created successfully");
+        
+        // Verify setup: editor user is in group and group has the entity
+        User retrieveEditorBefore = UserManager.getUser(editorUser.getAuthIdentifier(), user, true).getListOfUsers().get(0);
+        Group retrieveGroupBefore = GroupManager.getGroup(testGroup.getId(), user, false).getListOfGroups().get(0);
+        
+        System.out.println("Before removal - Editor user groups: " + retrieveEditorBefore.getGroups());
+        System.out.println("Before removal - Group users: " + retrieveGroupBefore.getUsers());
+        System.out.println("Before removal - Group entities: " + retrieveGroupBefore.getEntities());
+        
+        assertEquals(1, retrieveEditorBefore.getGroups().size(), "Editor should be in 1 group before removal");
+        assertEquals(testGroup.getId(), retrieveEditorBefore.getGroups().get(0).getGroupId(), "Editor should be in the test group");
+        assertEquals(RoleType.EDITOR, retrieveEditorBefore.getGroups().get(0).getRole(), "User should have EDITOR role");
+        assertEquals(1, retrieveGroupBefore.getUsers().size(), "Group should have 1 user (editor) before removal");
+        assertTrue(retrieveGroupBefore.getEntities().size() >= 1, "Group should have at least 1 entity before removal");
+        
+        // Now try to remove the editor user from the group (admin doing the removal)
+        RemoveUserFromGroupBean removeUserFromGroupBean = new RemoveUserFromGroupBean();
+        removeUserFromGroupBean.setGroupid(testGroup.getId());
+        removeUserFromGroupBean.setUserid(editorUser.getAuthIdentifier());
+        
+        var response = UserManager.removeUserFromGroup(removeUserFromGroupBean, user);
+        System.out.println("Remove editor (who has entity in same group) - Response code: " + response.getCode() + ", message: " + response.getMessage());
+        
+        // Verify the result - the user should be successfully removed
+        assertEquals(ApiResponseMessage.OK, response.getCode(), 
+            "Should be able to remove editor user from group even when they own an entity in the same group. Got: " + response.getMessage());
+        
+        // Verify the user is no longer in the group
+        User retrieveEditorAfter = UserManager.getUser(editorUser.getAuthIdentifier(), user, true).getListOfUsers().get(0);
+        Group retrieveGroupAfter = GroupManager.getGroup(testGroup.getId(), user, false).getListOfGroups().get(0);
+        
+        System.out.println("After removal - Editor user groups: " + retrieveEditorAfter.getGroups());
+        System.out.println("After removal - Group users: " + retrieveGroupAfter.getUsers());
+        System.out.println("After removal - Group entities: " + retrieveGroupAfter.getEntities());
+        
+        assertAll(
+            () -> assertEquals(0, retrieveEditorAfter.getGroups().size(), "Editor should have 0 groups after removal"),
+            () -> assertEquals(0, retrieveGroupAfter.getUsers().size(), "Group should have 0 users after removal"),
+            () -> assertTrue(retrieveGroupAfter.getEntities().size() >= 1, "Group should still have the entity after user removal")
+        );
+        
+        // Cleanup
+        UserManager.deleteUser(editorUser.getAuthIdentifier(), user);
+        GroupManager.deleteGroup(testGroup.getId(), user);
+    }
+
+    @Test
+    @Order(11)
     public void testDeleteUser() {
         UserManager.deleteUser(user.getAuthIdentifier(), user);
 
@@ -334,7 +428,7 @@ public class UserGroupManagementTest extends TestcontainersLifecycle {
     }
 
     @Test
-    @Order(11)
+    @Order(12)
     public void testDeleteGroup() {
 
         GroupManager.deleteGroup(group.getId(), user);
@@ -344,7 +438,7 @@ public class UserGroupManagementTest extends TestcontainersLifecycle {
 
 
     @Test
-    @Order(12)
+    @Order(13)
     public void testCreateGroupWithoutName() {
         Group group = new Group(UUID.randomUUID().toString(), null, "Test Decription");
         GroupManager.createGroup(group, user);
