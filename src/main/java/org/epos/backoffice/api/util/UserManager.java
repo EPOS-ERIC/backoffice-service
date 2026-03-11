@@ -16,6 +16,7 @@ public class UserManager {
 
 
 	public static ApiResponseMessage getUser(String instance_id, User user, Boolean available_section) {
+		EposDataModelDAO.getInstance().clearAllCaches();
 
 		if (instance_id == null)
 			return new ApiResponseMessage(ApiResponseMessage.ERROR, "The [instance_id] field can't be left blank");
@@ -37,6 +38,8 @@ public class UserManager {
 
 		List<User> userStream = personList.stream()
 				.filter(x -> x.getAuthIdentifier() != null && !x.getAuthIdentifier().isEmpty()).collect(Collectors.toList());
+
+		EposDataModelDAO.getInstance().clearAllCaches();
 
 		System.out.println("USER STREAM: "+userStream);
 
@@ -63,6 +66,7 @@ public class UserManager {
 		inputUser.setIsAdmin(inputUser.getIsAdmin() == null ? user.getIsAdmin() : inputUser.getIsAdmin());
 
 		if (UserGroupManagementAPI.createUser(inputUser)) {
+			EposDataModelDAO.getInstance().clearAllCaches();
 			return new ApiResponseMessage(ApiResponseMessage.OK, "User created successfully");
 		}
 
@@ -79,6 +83,8 @@ public class UserManager {
 				userGroup.getUserid(),
 				RoleType.valueOf(userGroup.getRole()),
 				RequestStatusType.valueOf(userGroup.getStatusType()));
+
+		EposDataModelDAO.getInstance().clearAllCaches();
 
 		if(result!=null && result)
 			return new ApiResponseMessage(ApiResponseMessage.OK, "User added successfully");
@@ -107,6 +113,8 @@ public class UserManager {
 				RoleType.valueOf(userGroup.getRole()),
 				RequestStatusType.valueOf(userGroup.getStatusType()));
 
+		EposDataModelDAO.getInstance().clearAllCaches();
+
 		if(result!=null && result)
 			return new ApiResponseMessage(ApiResponseMessage.OK, "User updated successfully");
 
@@ -115,6 +123,7 @@ public class UserManager {
 
 
 	public static ApiResponseMessage removeUserFromGroup(RemoveUserFromGroupBean removeUserFromGroupBean, User user) {
+		EposDataModelDAO.getInstance().clearAllCaches();
 		if(!user.getIsAdmin()) return new ApiResponseMessage(ApiResponseMessage.ERROR, "You can't remove users from groups");
 
 		Boolean result = UserGroupManagementAPI.removeUserFromGroup(
@@ -147,7 +156,10 @@ public class UserManager {
 		inputUser.setAuthIdentifier(inputUser.getAuthIdentifier() == null ? user.getAuthIdentifier() : inputUser.getAuthIdentifier());
 		inputUser.setIsAdmin(inputUser.getIsAdmin() == null ? user.getIsAdmin() : inputUser.getIsAdmin());
 
+		EposDataModelDAO.getInstance().clearAllCaches();
+
 		if(UserGroupManagementAPI.createUser(inputUser)) {
+			EposDataModelDAO.getInstance().clearAllCaches();
 
 			return new ApiResponseMessage(ApiResponseMessage.OK, "User updated successfully");
 		}
@@ -161,6 +173,7 @@ public class UserManager {
 		if(!user.getIsAdmin()) return new ApiResponseMessage(ApiResponseMessage.ERROR, "You can't delete users");
 
 		if(UserGroupManagementAPI.deleteUser(instance_id)){
+			EposDataModelDAO.getInstance().clearAllCaches();
 
 			return new ApiResponseMessage(ApiResponseMessage.OK, "User deleted successfully");
 		}

@@ -15,6 +15,8 @@ public class GroupManager {
 
 	public static ApiResponseMessage getGroup(String instance_id, User user, Boolean available_section) {
 
+		EposDataModelDAO.getInstance().clearAllCaches();
+
 		if (instance_id == null)
 			return new ApiResponseMessage(ApiResponseMessage.ERROR, "The [instance_id] field can't be left blank");
 
@@ -86,6 +88,7 @@ public class GroupManager {
 	}
 
 	public static ApiResponseMessage addEntityToGroup(AddEntityToGroupBean entityGroup, User user) {
+		EposDataModelDAO.getInstance().clearAllCaches();
 
 		if(!user.getIsAdmin()) return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "You can't add entities to groups");
 
@@ -100,6 +103,7 @@ public class GroupManager {
 	}
 
     public static ApiResponseMessage removeEntityFromGroup(AddEntityToGroupBean addEntityToGroupBean, User user) {
+		EposDataModelDAO.getInstance().clearAllCaches();
 
 		if(!user.getIsAdmin()) return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "You can't remove entities from groups");
 
