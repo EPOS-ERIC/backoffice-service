@@ -464,7 +464,7 @@ public class EPOSDataModelManager {
         switch (status) {
             case DRAFT:
                 // viewer: no, editor: all, reviewer: no
-                if (RoleType.EDITOR.name().equals(userRole)) {
+                if (RoleType.EDITOR.name().equals(userRole) || RoleType.ADMIN.name().equals(userRole)) {
                     log.debug("checkUserPermissionsReadWrite - DRAFT, editor role, granting access");
                     return true;
                 }
@@ -473,7 +473,7 @@ public class EPOSDataModelManager {
 
             case SUBMITTED:
                 // viewer: no, editor: self, reviewer: no
-                if (RoleType.EDITOR.name().equals(userRole)) {
+                if (RoleType.REVIEWER.name().equals(userRole) || RoleType.ADMIN.name().equals(userRole)) {
                     log.debug("checkUserPermissionsReadWrite - SUBMITTED, editor role, access based on ownership: {}", isOwner);
                     return isOwner;
                 }
@@ -483,7 +483,7 @@ public class EPOSDataModelManager {
             case PUBLISHED:
             case DISCARDED:
                 // viewer: no, editor: no, reviewer: all
-                if (RoleType.REVIEWER.name().equals(userRole)) {
+                if (RoleType.REVIEWER.name().equals(userRole) || RoleType.ADMIN.name().equals(userRole)) {
                     log.debug("checkUserPermissionsReadWrite - {}, reviewer role, granting access", status);
                     return true;
                 }
