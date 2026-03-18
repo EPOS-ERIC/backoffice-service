@@ -560,6 +560,11 @@ public class EPOSDataModelManager {
         // Apply view permissions based on role and status
         switch (status) {
             case DRAFT:
+                // viewer: no, editor: self, reviewer: all
+                if (RoleType.ADMIN.name().equals(userRole)) {
+                    log.debug("checkUserPermissionsReadOnly - DRAFT, reviewer role, granting access");
+                    return true;
+                }
                 // viewer: no, editor: self, reviewer: no
                 if (RoleType.EDITOR.name().equals(userRole)) {
                     log.debug("checkUserPermissionsReadOnly - DRAFT, editor role, access based on ownership: {}", isOwner);
@@ -570,6 +575,10 @@ public class EPOSDataModelManager {
 
             case SUBMITTED:
                 // viewer: no, editor: self, reviewer: all
+                if (RoleType.ADMIN.name().equals(userRole)) {
+                    log.debug("checkUserPermissionsReadOnly - SUBMITTED, reviewer role, granting access");
+                    return true;
+                }
                 if (RoleType.REVIEWER.name().equals(userRole)) {
                     log.debug("checkUserPermissionsReadOnly - SUBMITTED, reviewer role, granting access");
                     return true;
