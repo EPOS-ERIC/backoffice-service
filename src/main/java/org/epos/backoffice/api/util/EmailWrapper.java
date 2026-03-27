@@ -73,6 +73,22 @@ public class EmailWrapper {
         sendEmailDirect(adminEmails, new EmailRequest(body, subject));
     }
 
+    public static void wrapGroupAccessAccepted(AddUserToGroupBean userGroup, User acceptedUser, User approver) {
+        if (acceptedUser == null || acceptedUser.getEmail() == null || acceptedUser.getEmail().isBlank()) {
+            log.warn("Skipping group access accepted email because accepted user has no email address");
+            return;
+        }
+
+        Group acceptedGroup = userGroup.getGroupid() != null
+                ? UserGroupManagementAPI.retrieveGroupById(userGroup.getGroupid())
+                : null;
+
+        String subject = generateGroupAccessAcceptedSubject(acceptedGroup);
+        String body = generateGroupAccessAcceptedBody(acceptedUser, approver, acceptedGroup, userGroup);
+
+        sendEmailDirect(List.of(acceptedUser.getEmail().trim()), new EmailRequest(body, subject));
+    }
+
     private static String generateEmailSubject(EPOSDataModelEntity edmentity) {
         if(edmentity instanceof DataProduct)
             return String.format("[EPOS] Review Request: %s", ((DataProduct) edmentity).getTitle());
@@ -160,6 +176,39 @@ public class EmailWrapper {
                 requester.getEmail() != null ? requester.getEmail() : "N/A",
                 requester.getAuthIdentifier() != null ? requester.getAuthIdentifier() : "N/A",
                 userGroup.getUserid() != null ? userGroup.getUserid() : "N/A",
+                LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+    }
+
+    private static String generateGroupAccessAcceptedSubject(Group acceptedGroup) {
+        String groupName = acceptedGroup != null && acceptedGroup.getName() != null && !acceptedGroup.getName().isBlank()
+                ? acceptedGroup.getName()
+                : "N/A";
+
+        return String.format("[EPOS] Group Access Approved: %s", groupName);
+    }
+
+    private static String generateGroupAccessAcceptedBody(User acceptedUser, User approver, Group acceptedGroup, AddUserToGroupBean userGroup) {
+        String groupName = acceptedGroup != null && acceptedGroup.getName() != null && !acceptedGroup.getName().isBlank()
+                ? acceptedGroup.getName()
+                : "N/A";
+        String approverName = approver != null
+                ? String.format("%s %s",
+                approver.getFirstName() != null ? approver.getFirstName() : "N/A",
+                approver.getLastName() != null ? approver.getLastName() : "N/A")
+                : "N/A";
+        String approverEmail = approver != null && approver.getEmail() != null ? approver.getEmail() : "N/A";
+
+        return String.format(
+                "Hello %s,\n\n"
+                        + "You got accepted in the group %s.\n"
+                        + "Approved by: %s (%s)\n"
+                        + "Role: %s\n"
+                        + "Approved on: %s\n",
+                acceptedUser.getFirstName() != null ? acceptedUser.getFirstName() : "user",
+                groupName,
+                approverName,
+                approverEmail,
+                userGroup.getRole() != null ? userGroup.getRole() : "N/A",
                 LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
     }
 

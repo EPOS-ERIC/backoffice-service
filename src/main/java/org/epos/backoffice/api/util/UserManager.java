@@ -105,6 +105,7 @@ public class UserManager {
 
 		User userRetrieved = UserGroupManagementAPI.retrieveUserById(userGroup.getUserid());
 		if(userRetrieved==null) return new ApiResponseMessage(ApiResponseMessage.ERROR, "User not found");
+		String previousRequestStatus = getGroupRequestStatus(userGroup.getGroupid(), userGroup.getUserid());
 		boolean exists = false;
 		for(UserGroup userGroup1 : userRetrieved.getGroups()) {
 			if(userGroup1.getGroupId().equals(userGroup.getGroupid())) exists = true;
@@ -122,10 +123,36 @@ public class UserManager {
 
 		EposDataModelDAO.getInstance().clearAllCaches();
 
-		if(result!=null && result)
+		if(result!=null && result) {
+			if(shouldNotifyAcceptedGroupAccess(userGroup, previousRequestStatus)) {
+				EmailWrapper.wrapGroupAccessAccepted(userGroup, userRetrieved, user);
+			}
 			return new ApiResponseMessage(ApiResponseMessage.OK, "User updated successfully");
+		}
 
 		return new ApiResponseMessage(ApiResponseMessage.ERROR, "You can't update the user to group");
+	}
+
+	static boolean shouldNotifyAcceptedGroupAccess(AddUserToGroupBean userGroup, String previousRequestStatus) {
+		if(userGroup == null) return false;
+		if(!RequestStatusType.ACCEPTED.name().equals(userGroup.getStatusType())) return false;
+
+		return !RequestStatusType.ACCEPTED.name().equals(previousRequestStatus);
+	}
+
+	private static String getGroupRequestStatus(String groupId, String userId) {
+		if(groupId == null || userId == null) return null;
+
+		org.epos.eposdatamodel.Group group = UserGroupManagementAPI.retrieveGroupById(groupId);
+		if(group == null || group.getUsers() == null) return null;
+
+		for(Map<String, String> groupUser : group.getUsers()) {
+			if(groupUser != null && userId.equals(groupUser.get("userId"))) {
+				return groupUser.get("requestStatus");
+			}
+		}
+
+		return null;
 	}
 
 
