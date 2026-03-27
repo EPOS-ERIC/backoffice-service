@@ -76,7 +76,10 @@ public class UserManager {
 	public static ApiResponseMessage addUserToGroup(AddUserToGroupBean userGroup, User user) {
 		EposDataModelDAO.getInstance().clearAllCaches();
 
-		if(!user.getIsAdmin() && userGroup.getStatusType().equals("ACCEPTED")) return new ApiResponseMessage(ApiResponseMessage.ERROR, "You can't add users to groups");
+		boolean acceptedStatus = RequestStatusType.ACCEPTED.name().equals(userGroup.getStatusType());
+		boolean pendingStatus = RequestStatusType.PENDING.name().equals(userGroup.getStatusType());
+
+		if(!Boolean.TRUE.equals(user.getIsAdmin()) && acceptedStatus) return new ApiResponseMessage(ApiResponseMessage.ERROR, "You can't add users to groups");
 
 		Boolean result = UserGroupManagementAPI.addUserToGroup(
 				userGroup.getGroupid(),
@@ -86,8 +89,12 @@ public class UserManager {
 
 		EposDataModelDAO.getInstance().clearAllCaches();
 
-		if(result!=null && result)
+		if(result!=null && result) {
+			if(!Boolean.TRUE.equals(user.getIsAdmin()) && pendingStatus) {
+				EmailWrapper.wrapGroupAccessRequest(userGroup, user);
+			}
 			return new ApiResponseMessage(ApiResponseMessage.OK, "User added successfully");
+		}
 
 		return new ApiResponseMessage(ApiResponseMessage.ERROR, "You can't add the user to group");
 	}
@@ -105,7 +112,7 @@ public class UserManager {
 
 		if(!exists) return addUserToGroup(userGroup, user);
 
-		if(!user.getIsAdmin() && userGroup.getStatusType().equals("ACCEPTED")) return new ApiResponseMessage(ApiResponseMessage.ERROR, "You can't update users to groups");
+		if(!Boolean.TRUE.equals(user.getIsAdmin()) && RequestStatusType.ACCEPTED.name().equals(userGroup.getStatusType())) return new ApiResponseMessage(ApiResponseMessage.ERROR, "You can't update users to groups");
 
 		Boolean result = UserGroupManagementAPI.updateUserInGroup(
 				userGroup.getGroupid(),

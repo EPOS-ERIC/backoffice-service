@@ -1,8 +1,8 @@
 package org.epos.backoffice.api.util;
 
-import org.epos.backoffice.api.controller.ReviewNotificationController;
 import org.epos.eposdatamodel.DataProduct;
 import org.epos.eposdatamodel.EPOSDataModelEntity;
+import org.epos.eposdatamodel.Group;
 import org.epos.eposdatamodel.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,19 +14,21 @@ import usermanagementapis.UserGroupManagementAPI;
 import java.net.URI;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 public class EmailWrapper {
 
     private static final Logger log = LoggerFactory.getLogger(EmailWrapper.class);
 
-    private static final RestTemplate restTemplate = new RestTemplate();
+    private static RestTemplate restTemplate = new RestTemplate();
 
     public static void wrapSubmitted(EPOSDataModelEntity edmentity, User user, String meta_id, String instance_id){
         String subject = generateEmailSubject(edmentity);
         String body = generateEmailBody(edmentity, user, meta_id, instance_id);
 
-        ReviewNotificationController.ReviewEmailRequest externalRequest = new ReviewNotificationController.ReviewEmailRequest(body, subject);
+        EmailRequest externalRequest = new EmailRequest(body, subject);
 
         URI url = UriComponentsBuilder.fromUriString("http://email-sender-service:8080")
                 .path("/api/email-sender-service/v1/sender/send-email-group/")
@@ -36,13 +38,39 @@ public class EmailWrapper {
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<ReviewNotificationController.ReviewEmailRequest> entity = new HttpEntity<>(externalRequest, headers);
+            HttpEntity<EmailRequest> entity = new HttpEntity<>(externalRequest, headers);
 
             restTemplate.postForEntity(url, entity, Void.class);
             log.debug("Review request sent successfully");
         } catch (Exception e) {
             log.error("Error calling email-sender-service", e);
         }
+    }
+
+    public static void wrapGroupAccessRequest(AddUserToGroupBean userGroup, User requester) {
+        List<String> adminEmails = UserGroupManagementAPI.retrieveAllUsers().stream()
+                .filter(Objects::nonNull)
+                .filter(admin -> Boolean.TRUE.equals(admin.getIsAdmin()))
+                .map(User::getEmail)
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(email -> !email.isEmpty())
+                .distinct()
+                .toList();
+
+        if (adminEmails.isEmpty()) {
+            log.warn("Skipping group access request email because no global admin email addresses were found");
+            return;
+        }
+
+        Group requestedGroup = userGroup.getGroupid() != null
+                ? UserGroupManagementAPI.retrieveGroupById(userGroup.getGroupid())
+                : null;
+
+        String subject = generateGroupAccessRequestSubject(requestedGroup, userGroup.getGroupid());
+        String body = generateGroupAccessRequestBody(userGroup, requester, requestedGroup);
+
+        sendEmailDirect(adminEmails, new EmailRequest(body, subject));
     }
 
     private static String generateEmailSubject(EPOSDataModelEntity edmentity) {
@@ -98,14 +126,79 @@ public class EmailWrapper {
                 LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
     }
 
-    public static class ReviewEmailRequest {
+    private static String generateGroupAccessRequestSubject(Group requestedGroup, String groupId) {
+        String groupName = requestedGroup != null && requestedGroup.getName() != null && !requestedGroup.getName().isBlank()
+                ? requestedGroup.getName()
+                : groupId != null ? groupId : "N/A";
+
+        return String.format("[EPOS] Group Access Request: %s", groupName);
+    }
+
+    private static String generateGroupAccessRequestBody(AddUserToGroupBean userGroup, User requester, Group requestedGroup) {
+        String groupName = requestedGroup != null && requestedGroup.getName() != null
+                ? requestedGroup.getName()
+                : "N/A";
+
+        return String.format(
+                "A user requested access to a group that requires approval.\n\n"
+                        + "Group Details:\n"
+                        + "Name: %s\n"
+                        + "ID: %s\n"
+                        + "Requested role: %s\n"
+                        + "Request status: %s\n\n"
+                        + "Requested by:\n"
+                        + "Name: %s %s\n"
+                        + "Email: %s\n"
+                        + "Auth identifier: %s\n"
+                        + "Requested on: %s\n",
+                groupName,
+                userGroup.getGroupid() != null ? userGroup.getGroupid() : "N/A",
+                userGroup.getRole() != null ? userGroup.getRole() : "N/A",
+                userGroup.getStatusType() != null ? userGroup.getStatusType() : "N/A",
+                requester.getFirstName() != null ? requester.getFirstName() : "N/A",
+                requester.getLastName() != null ? requester.getLastName() : "N/A",
+                requester.getEmail() != null ? requester.getEmail() : "N/A",
+                requester.getAuthIdentifier() != null ? requester.getAuthIdentifier() : "N/A",
+                userGroup.getUserid() != null ? userGroup.getUserid() : "N/A",
+                LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+    }
+
+    private static void sendEmailDirect(List<String> emails, EmailRequest externalRequest) {
+        URI url = UriComponentsBuilder.fromUriString("http://email-sender-service:8080")
+                .path("/api/email-sender-service/v1/sender/send-email-direct")
+                .queryParam("email", emails.toArray())
+                .build()
+                .encode()
+                .toUri();
+
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<EmailRequest> entity = new HttpEntity<>(externalRequest, headers);
+
+            restTemplate.postForEntity(url, entity, Void.class);
+            log.debug("Direct email sent successfully to {} recipients", emails.size());
+        } catch (Exception e) {
+            log.error("Error calling email-sender-service", e);
+        }
+    }
+
+    static void setRestTemplate(RestTemplate customRestTemplate) {
+        restTemplate = customRestTemplate;
+    }
+
+    static void resetRestTemplate() {
+        restTemplate = new RestTemplate();
+    }
+
+    public static class EmailRequest {
         private String bodyText;
         private String subject;
 
-        public ReviewEmailRequest() {
+        public EmailRequest() {
         }
 
-        public ReviewEmailRequest(String bodyText, String subject) {
+        public EmailRequest(String bodyText, String subject) {
             this.bodyText = bodyText;
             this.subject = subject;
         }
