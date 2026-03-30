@@ -175,7 +175,6 @@ public class EmailWrapper {
                 requester.getLastName() != null ? requester.getLastName() : "N/A",
                 requester.getEmail() != null ? requester.getEmail() : "N/A",
                 requester.getAuthIdentifier() != null ? requester.getAuthIdentifier() : "N/A",
-                userGroup.getUserid() != null ? userGroup.getUserid() : "N/A",
                 LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
     }
 
