@@ -111,6 +111,11 @@ public class EPOSDataModelManager {
                 }
                 // Set the target status for the new entity (default DRAFT)
                 obj.setStatus(obj.getStatus() == null ? StatusType.DRAFT : obj.getStatus());
+                if (obj.getStatus() == StatusType.DRAFT
+                        && hasDraftForUserAndMeta(dbapi, existingEntity.getMetaId(), user.getAuthIdentifier(), null)) {
+                    return new ApiResponseMessage(ApiResponseMessage.ERROR,
+                            "{\"response\" : \"A user can have only one DRAFT for the same entity\"}");
+                }
                 // Check if user can CREATE the new entity with the target status
                 if(!checkUserPermissionsReadWrite(obj, user, userGroupRoles)) {
                     return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "{\"response\" : \"The user can't create an entity with this status\"}");
@@ -214,6 +219,10 @@ public class EPOSDataModelManager {
             }
             // Different user trying to modify someone else's DRAFT -> Create NEW DRAFT
             // This allows multiple users to have their own DRAFTs of the same entity
+            if (hasDraftForUserAndMeta(dbapi, existingEntity.getMetaId(), user.getAuthIdentifier(), null)) {
+                return new ApiResponseMessage(ApiResponseMessage.ERROR,
+                        "{\"response\" : \"A user can have only one DRAFT for the same entity\"}");
+            }
             entityToSave.setInstanceId(UUID.randomUUID().toString());
             entityToSave.setMetaId(existingEntity.getMetaId());
             entityToSave.setInstanceChangedId(existingEntity.getInstanceChangedId() != null ?
@@ -242,6 +251,10 @@ public class EPOSDataModelManager {
 
         // PUBLISHED -> any other modification: Create new DRAFT version
         if (currentStatus == StatusType.PUBLISHED && newStatus != StatusType.ARCHIVED && newStatus != StatusType.DISCARDED) {
+            if (hasDraftForUserAndMeta(dbapi, existingEntity.getMetaId(), user.getAuthIdentifier(), null)) {
+                return new ApiResponseMessage(ApiResponseMessage.ERROR,
+                        "{\"response\" : \"A user can have only one DRAFT for the same entity\"}");
+            }
             entityToSave.setInstanceId(UUID.randomUUID().toString());
             entityToSave.setMetaId(existingEntity.getMetaId());
             entityToSave.setStatus(StatusType.DRAFT);
@@ -300,6 +313,29 @@ public class EPOSDataModelManager {
                 dbapi.create(entity, null, null, null);
             }
         }
+    }
+
+    private static boolean hasDraftForUserAndMeta(AbstractAPI dbapi, String metaId, String editorId, String excludeInstanceId) {
+        if (metaId == null || editorId == null) {
+            return false;
+        }
+
+        List<Object> allDrafts = dbapi.retrieveAllWithStatus(StatusType.DRAFT);
+        for (Object item : allDrafts) {
+            EPOSDataModelEntity draft = (EPOSDataModelEntity) item;
+            if (!metaId.equals(draft.getMetaId())) {
+                continue;
+            }
+            if (!editorId.equals(draft.getEditorId())) {
+                continue;
+            }
+            if (excludeInstanceId != null && excludeInstanceId.equals(draft.getInstanceId())) {
+                continue;
+            }
+            return true;
+        }
+
+        return false;
     }
 
     // ==================== PERMISSION HELPER METHODS ====================
@@ -472,8 +508,12 @@ public class EPOSDataModelManager {
                 return false;
 
             case SUBMITTED:
-                // viewer: no, editor: self, reviewer: no
-                if (RoleType.REVIEWER.name().equals(userRole) || RoleType.ADMIN.name().equals(userRole)) {
+                // viewer: no, editor: self, reviewer: all
+                if (RoleType.REVIEWER.name().equals(userRole)) {
+                    log.debug("checkUserPermissionsReadWrite - SUBMITTED, reviewer role, granting access");
+                    return true;
+                }
+                if (RoleType.EDITOR.name().equals(userRole)) {
                     log.debug("checkUserPermissionsReadWrite - SUBMITTED, editor role, access based on ownership: {}", isOwner);
                     return isOwner;
                 }
