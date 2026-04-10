@@ -56,14 +56,15 @@ public class UserManager {
 	 */
 	public static ApiResponseMessage createUser(User inputUser, User user) {
 		EposDataModelDAO.getInstance().clearAllCaches();
+		boolean requesterCanManageUsers = isExistingAdmin(user) || isBootstrapAdmin(user);
 
-		if(!user.getIsAdmin()) return new ApiResponseMessage(ApiResponseMessage.ERROR, "You can't register other user");
+		if(!requesterCanManageUsers) return new ApiResponseMessage(ApiResponseMessage.ERROR, "You can't register other user");
 
 		inputUser.setFirstName(inputUser.getFirstName() == null ? user.getFirstName() : inputUser.getFirstName());
 		inputUser.setLastName(inputUser.getLastName() == null ? user.getLastName() : inputUser.getLastName());
 		inputUser.setEmail(inputUser.getEmail() == null ? user.getEmail() : inputUser.getEmail());
 		inputUser.setAuthIdentifier(inputUser.getAuthIdentifier() == null ? user.getAuthIdentifier() : inputUser.getAuthIdentifier());
-		inputUser.setIsAdmin(inputUser.getIsAdmin() == null ? user.getIsAdmin() : inputUser.getIsAdmin());
+		inputUser.setIsAdmin(Boolean.TRUE.equals(inputUser.getIsAdmin()) && requesterCanManageUsers);
 
 		if (UserGroupManagementAPI.createUser(inputUser)) {
 			EposDataModelDAO.getInstance().clearAllCaches();
@@ -182,13 +183,17 @@ public class UserManager {
 	public static ApiResponseMessage updateUser(User inputUser, User user) {
 
 		EposDataModelDAO.getInstance().clearAllCaches();
-		if(!user.getIsAdmin()) return new ApiResponseMessage(ApiResponseMessage.ERROR, "You can't update users");
+		boolean requesterCanManageUsers = isExistingAdmin(user) || isBootstrapAdmin(user);
+		if(!requesterCanManageUsers) return new ApiResponseMessage(ApiResponseMessage.ERROR, "You can't update users");
 
 		inputUser.setFirstName(inputUser.getFirstName() == null ? user.getFirstName() : inputUser.getFirstName());
 		inputUser.setLastName(inputUser.getLastName() == null ? user.getLastName() : inputUser.getLastName());
 		inputUser.setEmail(inputUser.getEmail() == null ? user.getEmail() : inputUser.getEmail());
 		inputUser.setAuthIdentifier(inputUser.getAuthIdentifier() == null ? user.getAuthIdentifier() : inputUser.getAuthIdentifier());
-		inputUser.setIsAdmin(inputUser.getIsAdmin() == null ? user.getIsAdmin() : inputUser.getIsAdmin());
+		if(inputUser.getIsAdmin() == null) {
+			User existingUser = UserGroupManagementAPI.retrieveUserById(inputUser.getAuthIdentifier());
+			inputUser.setIsAdmin(existingUser != null && Boolean.TRUE.equals(existingUser.getIsAdmin()));
+		}
 
 		EposDataModelDAO.getInstance().clearAllCaches();
 
@@ -213,6 +218,21 @@ public class UserManager {
 		}
 
 		return new ApiResponseMessage(ApiResponseMessage.ERROR, "You can't delete other user");
+	}
+
+	private static boolean isExistingAdmin(User user) {
+		if(user == null || user.getAuthIdentifier() == null) return false;
+
+		User persistedUser = UserGroupManagementAPI.retrieveUserById(user.getAuthIdentifier());
+		return persistedUser != null && Boolean.TRUE.equals(persistedUser.getIsAdmin());
+	}
+
+	private static boolean isBootstrapAdmin(User user) {
+		if(user == null || user.getAuthIdentifier() == null) return false;
+		if(!Boolean.TRUE.equals(user.getIsAdmin())) return false;
+
+		List<User> allUsers = UserGroupManagementAPI.retrieveAllUsers();
+		return allUsers == null || allUsers.isEmpty();
 	}
 
 }
