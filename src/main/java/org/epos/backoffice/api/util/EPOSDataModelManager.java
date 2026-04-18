@@ -52,31 +52,60 @@ public class EPOSDataModelManager {
         }*/
 
         List<EPOSDataModelEntity> list;
+        String userId = user != null ? user.getAuthIdentifier() : null;
         
         // Pre-fetch user's group roles once for all permission checks (optimization)
         // For backoffice admins, we pass null since they have full access
         final Map<String, String> userGroupRoles = user.getIsAdmin() ? null : getUserAcceptedGroupRoles(user);
+
+        log.debug("Entity read request userId={} entityType={} metaId={} instanceId={}",
+                userId, entityNames.name(), meta_id, instance_id);
         
         if (meta_id.equals("all")) {
             // Retrieve all entities, only filter by user permissions
             list = dbapi.retrieveAll();
+            int totalEntities = list.size();
             list = list.stream()
                     .filter(elem -> checkUserPermissionsReadOnly(elem, user, userGroupRoles))
                     .collect(Collectors.toList());
+            if (!user.getIsAdmin()) {
+                log.info("Entity read filtered userId={} entityType={} metaId={} instanceId={} total={} visible={} userAcceptedGroups={}",
+                        userId, entityNames.name(), meta_id, instance_id, totalEntities, list.size(), userGroupRoles);
+            }
         } else {
             if(instance_id.equals("all")) {
                 // Retrieve all instances for a specific meta_id
                 list = dbapi.retrieveAll();
+                int totalEntities = list.size();
                 list = list.stream()
                         .filter(elem -> elem.getMetaId().equals(meta_id))
                         .filter(elem -> checkUserPermissionsReadOnly(elem, user, userGroupRoles))
                         .collect(Collectors.toList());
+                if (!user.getIsAdmin()) {
+                    log.info("Entity read filtered userId={} entityType={} metaId={} instanceId={} total={} visible={} userAcceptedGroups={}",
+                            userId, entityNames.name(), meta_id, instance_id, totalEntities, list.size(), userGroupRoles);
+                }
             } else {
                 // Retrieve a specific instance
                 list = new ArrayList<>();
                 EPOSDataModelEntity entity = (EPOSDataModelEntity) dbapi.retrieve(instance_id);
-                if(entity != null && entity.getMetaId().equals(meta_id) && checkUserPermissionsReadOnly(entity, user, userGroupRoles)) {
+                if (entity == null) {
+                    log.info("Entity read empty userId={} entityType={} metaId={} instanceId={} reason=INSTANCE_ID_NOT_FOUND",
+                            userId, entityNames.name(), meta_id, instance_id);
+                } else if (!entity.getMetaId().equals(meta_id)) {
+                    log.info("Entity read empty userId={} entityType={} metaId={} instanceId={} reason=META_INSTANCE_MISMATCH actualMetaId={}",
+                            userId, entityNames.name(), meta_id, instance_id, entity.getMetaId());
+                } else if (checkUserPermissionsReadOnly(entity, user, userGroupRoles)) {
                     list.add(entity);
+                } else {
+                    log.warn("Entity read denied userId={} entityType={} metaId={} instanceId={} status={} entityGroups={} userAcceptedGroups={}",
+                            userId,
+                            entityNames.name(),
+                            meta_id,
+                            instance_id,
+                            entity.getStatus(),
+                            entity.getGroups(),
+                            userGroupRoles);
                 }
             }
         }
@@ -95,6 +124,7 @@ public class EPOSDataModelManager {
         
         // Pre-fetch user's group roles once for all permission checks (optimization)
         final Map<String, String> userGroupRoles = user.getIsAdmin() ? null : getUserAcceptedGroupRoles(user);
+        String userId = user != null ? user.getAuthIdentifier() : null;
 
         // If creating from an existing entity (e.g., draft from published), retrieve it first
         EPOSDataModelEntity existingEntity = null;
@@ -108,6 +138,8 @@ public class EPOSDataModelManager {
                 // Inherit groups from existing entity if not specified
                 if(obj.getGroups() == null || obj.getGroups().isEmpty()) {
                     obj.setGroups(existingEntity.getGroups());
+                    log.info("Entity create inheriting groups userId={} entityType={} sourceInstanceId={} inheritedGroups={}",
+                            userId, entityNames.name(), existingEntity.getInstanceId(), existingEntity.getGroups());
                 }
                 // Set the target status for the new entity (default DRAFT)
                 obj.setStatus(obj.getStatus() == null ? StatusType.DRAFT : obj.getStatus());
@@ -134,6 +166,8 @@ public class EPOSDataModelManager {
                 Group allGroup = UserGroupManagementAPI.retrieveGroupByName("ALL");
                 if(allGroup != null) {
                     obj.setGroups(List.of(allGroup.getId()));
+                    log.warn("Entity create fallback to ALL group userId={} entityType={} fallbackGroupId={} instanceId={} metaId={}",
+                            userId, entityNames.name(), allGroup.getId(), obj.getInstanceId(), obj.getMetaId());
                 }
             } else {
                 obj.setGroups(userWritableGroups);
@@ -152,6 +186,23 @@ public class EPOSDataModelManager {
         if(obj.getStatus() == null) {
             obj.setStatus(StatusType.DRAFT);
         }
+
+        log.info("Entity create request userId={} entityType={} metaId={} instanceId={} status={} groups={}",
+                userId,
+                entityNames.name(),
+                obj.getMetaId(),
+                obj.getInstanceId(),
+                obj.getStatus(),
+                obj.getGroups());
+        if (obj.getGroups() == null || obj.getGroups().isEmpty()) {
+            log.warn("Entity create with empty groups userId={} entityType={} metaId={} instanceId={} status={}",
+                    userId,
+                    entityNames.name(),
+                    obj.getMetaId(),
+                    obj.getInstanceId(),
+                    obj.getStatus());
+        }
+
         obj.setEditorId(user.getAuthIdentifier());
         obj.setFileProvenance("backoffice");
 
@@ -175,6 +226,7 @@ public class EPOSDataModelManager {
     public static ApiResponseMessage updateEposDataModelEntity(EPOSDataModelEntity obj, User user, EntityNames entityNames, Class clazz) {
         EposDataModelDAO.getInstance().clearAllCaches();
         AbstractAPI dbapi = AbstractAPI.retrieveAPI(entityNames.name());
+        String userId = user != null ? user.getAuthIdentifier() : null;
 
         if (obj.getInstanceId() == null) {
             return new ApiResponseMessage(ApiResponseMessage.ERROR, "{\"response\" : \"InstanceId required for update\"}");
@@ -199,6 +251,26 @@ public class EPOSDataModelManager {
 
         entityToSave.setStatus(newStatus);
         entityToSave.setFileProvenance("backoffice");
+
+        log.info("Entity update request userId={} entityType={} metaId={} instanceId={} currentStatus={} newStatus={} existingGroups={} requestedGroups={} groupsToSave={}",
+                userId,
+                entityNames.name(),
+                existingEntity.getMetaId(),
+                existingEntity.getInstanceId(),
+                currentStatus,
+                newStatus,
+                existingEntity.getGroups(),
+                obj.getGroups(),
+                entityToSave.getGroups());
+        if (entityToSave.getGroups() == null || entityToSave.getGroups().isEmpty()) {
+            log.warn("Entity update with empty groups userId={} entityType={} metaId={} instanceId={} currentStatus={} newStatus={}",
+                    userId,
+                    entityNames.name(),
+                    existingEntity.getMetaId(),
+                    existingEntity.getInstanceId(),
+                    currentStatus,
+                    newStatus);
+        }
 
         if (currentStatus == StatusType.PUBLISHED && newStatus == StatusType.PUBLISHED
                 && (entityNames.equals(EntityNames.CATEGORYSCHEME) || entityNames.equals(EntityNames.CATEGORY)

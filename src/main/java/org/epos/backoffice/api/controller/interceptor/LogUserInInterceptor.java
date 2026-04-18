@@ -32,19 +32,21 @@ public class LogUserInInterceptor implements HandlerInterceptor {
         }*/
 
 
-        System.out.println(allRequestParams);
-
-        if (!allRequestParams.containsKey("userId")) {
+        if (!allRequestParams.containsKey("userId")
+                || allRequestParams.get("userId") == null
+                || allRequestParams.get("userId").isBlank()) {
             String message = "{\"message\": \"The user is not correctly logged in\"}";
+            log.warn("Request rejected: missing userId. method={} path={}",
+                    request.getMethod(), request.getRequestURI());
             response.setContentType("application/json");
             response.getWriter().write(message);
             response.setStatus(400);
             return false;
         }
 
-        User user = UserGroupManagementAPI.retrieveUserById(allRequestParams.get("userId"));
-
-        System.out.println("RETRIEVED USER: "+user);
+        String userId = allRequestParams.get("userId");
+        User user = UserGroupManagementAPI.retrieveUserById(userId);
+        log.debug("User lookup userId={} found={}", userId, user != null);
 
         if(user == null){
             user = new User();
@@ -54,10 +56,12 @@ public class LogUserInInterceptor implements HandlerInterceptor {
             user.setLastName(allRequestParams.get("lastName"));
             user.setIsAdmin(false); //SWITCH when possible to false
             if(UserGroupManagementAPI.createUser(user)){
-                user = UserGroupManagementAPI.retrieveUserById(allRequestParams.get("userId"));
-                System.out.println("CREATED USER: "+user);
+                user = UserGroupManagementAPI.retrieveUserById(userId);
+                log.info("User auto-created userId={}", userId);
             } else {
                 String message = "{\"message\": \"The user doesn't exists\"}";
+                log.warn("Request rejected: user creation failed userId={} method={} path={}",
+                        userId, request.getMethod(), request.getRequestURI());
                 response.setContentType("application/json");
                 response.getWriter().write(message);
                 response.setStatus(400);
@@ -66,7 +70,10 @@ public class LogUserInInterceptor implements HandlerInterceptor {
 
 
         }
-        System.out.println("FINAL USER: "+user);
+        int groupCount = user.getGroups() == null ? 0 : user.getGroups().size();
+        log.debug("User authenticated userId={} isAdmin={} groupCount={} method={} path={}",
+                user.getAuthIdentifier(), user.getIsAdmin(), groupCount,
+                request.getMethod(), request.getRequestURI());
 
         HttpSession session = request.getSession();
         session.setAttribute("user", user);

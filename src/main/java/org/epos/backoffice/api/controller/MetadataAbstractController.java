@@ -6,6 +6,8 @@ import metadataapis.EntityNames;
 import org.epos.backoffice.api.util.ApiResponseMessage;
 import org.epos.backoffice.api.util.EPOSDataModelManager;
 import org.epos.eposdatamodel.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
@@ -16,6 +18,7 @@ import java.util.*;
 
 public abstract class MetadataAbstractController<T extends EPOSDataModelEntity> extends AbstractController<T> {
 
+	private static final Logger log = LoggerFactory.getLogger(MetadataAbstractController.class);
 	protected static AbstractAPI dbapi;
 
 	public MetadataAbstractController(ObjectMapper objectMapper, HttpServletRequest request, Class<T> entityType) {
@@ -36,10 +39,23 @@ public abstract class MetadataAbstractController<T extends EPOSDataModelEntity> 
 			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized: User not found in session.");
 		}
 
-		List items = EPOSDataModelManager.getEPOSDataModelEposDataModelEntity(meta_id,instance_id,user,EntityNames.valueOf(entityType.getSimpleName().toUpperCase()),entityType).getListOfEntities();
+		ApiResponseMessage response = EPOSDataModelManager.getEPOSDataModelEposDataModelEntity(
+				meta_id,
+				instance_id,
+				user,
+				EntityNames.valueOf(entityType.getSimpleName().toUpperCase()),
+				entityType);
+		List items = response.getListOfEntities();
 
-		if (items!=null && items.isEmpty())
+		if (items!=null && items.isEmpty()) {
+			log.info("Metadata GET empty result entityType={} metaId={} instanceId={} userId={} diagnostic={}",
+					entityType.getSimpleName(),
+					meta_id,
+					instance_id,
+					user.getAuthIdentifier(),
+					response.getMessage());
 			return ResponseEntity.status(404).body(new ArrayList<>());
+		}
 
 		return ResponseEntity
 				.status(200)
