@@ -1,28 +1,26 @@
 package org.epos.backoffice.api.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.enums.ParameterIn;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import model.RequestStatusType;
-import model.RoleType;
-import org.epos.backoffice.api.util.AddUserToGroupBean;
 import org.epos.backoffice.api.util.ApiResponseMessage;
 import org.epos.backoffice.api.util.UserManager;
 import org.epos.eposdatamodel.User;
-import org.epos.eposdatamodel.UserGroup;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.RestController;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.servlet.http.HttpServletRequest;
-import java.util.HashMap;
-import java.util.Map;
 
 @RestController
 public class UserController extends ManagementAbstractController<User> implements ApiUserGroupDocTag {
@@ -52,8 +50,6 @@ public class UserController extends ManagementAbstractController<User> implement
 			) {
 		User user = getUserFromSession();
 		
-		System.out.println("Session User: "+user.toString());
-
 		ApiResponseMessage response = UserManager.updateUser(body, user);
 		if(response.getCode()!=4) return ResponseEntity.status(400).body(response);
 
@@ -79,7 +75,6 @@ public class UserController extends ManagementAbstractController<User> implement
 			@RequestBody User body
 			) {
 		User user = getUserFromSession();
-		System.out.println("Session User: "+user.toString());
 
 		ApiResponseMessage response = UserManager.createUser(body, user);
 		if(response.getCode()!=4) return ResponseEntity.status(400).body(response);
@@ -114,10 +109,8 @@ public class UserController extends ManagementAbstractController<User> implement
 
 		User user = getUserFromSession();
 
-		System.out.println("Session User: "+user.toString());
-		
 		ApiResponseMessage response = UserManager.getUser(instance_id, user, available_section);
-        System.out.println("Session User: "+response);
+        // System.out.println("Session User: "+response);
 		if(response.getCode()==6) return ResponseEntity.status(403).body(response);
 		if(response.getCode()!=4) return ResponseEntity.status(400).body(response);
 
@@ -144,8 +137,6 @@ public class UserController extends ManagementAbstractController<User> implement
 			) {
 		User user = getUserFromSession();
 
-		System.out.println("Session User: "+user.toString());
-
 		ApiResponseMessage response = UserManager.deleteUser(instance_id, user);
 		if(response.getCode()!=4) return ResponseEntity.status(400).body(response);
 
@@ -153,6 +144,4 @@ public class UserController extends ManagementAbstractController<User> implement
 				.status(200)
 				.body(response);
 	}
-
-
 }
