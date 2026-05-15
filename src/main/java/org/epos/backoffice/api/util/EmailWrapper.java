@@ -1,5 +1,6 @@
 package org.epos.backoffice.api.util;
 
+import model.StatusType;
 import org.epos.eposdatamodel.DataProduct;
 import org.epos.eposdatamodel.EPOSDataModelEntity;
 import org.epos.eposdatamodel.Group;
@@ -89,6 +90,34 @@ public class EmailWrapper {
         sendEmailDirect(List.of(acceptedUser.getEmail().trim()), new EmailRequest(body, subject));
     }
 
+    public static void wrapPublishedOrDiscarded(EPOSDataModelEntity edmentity, String ownerId, User actor, String meta_id, String instance_id) {
+        if (ownerId == null || ownerId.isBlank()) {
+            log.warn("Skipping status email because entity owner is missing");
+            return;
+        }
+
+        StatusType status = edmentity.getStatus();
+        if (status != StatusType.PUBLISHED && status != StatusType.DISCARDED) {
+            log.warn("Skipping status email because entity status {} is not supported", status);
+            return;
+        }
+
+        User owner = UserGroupManagementAPI.retrieveUserById(ownerId);
+        if (owner == null) {
+            log.warn("Skipping status email because entity owner {} was not found", ownerId);
+            return;
+        }
+        if (owner.getEmail() == null || owner.getEmail().isBlank()) {
+            log.warn("Skipping status email because entity owner {} has no email address", ownerId);
+            return;
+        }
+
+        String subject = generatePublishedOrDiscardedSubject(edmentity, status);
+        String body = generatePublishedOrDiscardedBody(edmentity, owner, actor, status, meta_id, instance_id);
+
+        sendEmailDirect(List.of(owner.getEmail().trim()), new EmailRequest(body, subject));
+    }
+
     private static String generateEmailSubject(EPOSDataModelEntity edmentity) {
         if(edmentity instanceof DataProduct)
             return String.format("[EPOS] Review Request: %s", ((DataProduct) edmentity).getTitle());
@@ -140,6 +169,58 @@ public class EmailWrapper {
                 submitter.getEmail() != null ? submitter.getEmail() : "N/A",
                 groupList,
                 LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+    }
+
+    private static String generatePublishedOrDiscardedSubject(EPOSDataModelEntity edmentity, StatusType status) {
+        String action = status == StatusType.PUBLISHED ? "Record Published" : "Record Discarded";
+        return String.format("[EPOS] %s: %s", action, getEntityLabel(edmentity));
+    }
+
+    private static String generatePublishedOrDiscardedBody(EPOSDataModelEntity edmentity, User owner, User actor, StatusType status, String metaId, String instanceId) {
+        String title = null;
+
+        if(edmentity instanceof DataProduct) {
+            if (((DataProduct) edmentity).getTitle() != null) {
+                title = String.valueOf(((DataProduct) edmentity).getTitle());
+            }
+        }
+
+        String className = edmentity.getClass().getSimpleName();
+        String action = status == StatusType.PUBLISHED ? "published" : "discarded";
+        String actionLabel = status == StatusType.PUBLISHED ? "Published" : "Discarded";
+
+        return String.format(
+                "Hello %s,\n\n"
+                        + "Your submitted record has been %s.\n\n"
+                        + className + " Details:\n"
+                        + "Title: %s\n"
+                        + "UID: %s\n"
+                        + "Meta ID: %s\n"
+                        + "Instance ID: %s\n\n"
+                        + actionLabel + " by:\n"
+                        + "Name: %s %s\n"
+                        + "Email: %s\n\n"
+                        + actionLabel + " on: %s\n",
+                owner.getFirstName() != null ? owner.getFirstName() : "user",
+                action,
+                title != null ? title : "N/A",
+                edmentity.getUid() != null ? edmentity.getUid() : "N/A",
+                metaId,
+                instanceId,
+                actor.getFirstName() != null ? actor.getFirstName() : "N/A",
+                actor.getLastName() != null ? actor.getLastName() : "N/A",
+                actor.getEmail() != null ? actor.getEmail() : "N/A",
+                LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+    }
+
+    private static String getEntityLabel(EPOSDataModelEntity edmentity) {
+        if (edmentity instanceof DataProduct && ((DataProduct) edmentity).getTitle() != null) {
+            return String.valueOf(((DataProduct) edmentity).getTitle());
+        }
+        if (edmentity.getUid() != null && !edmentity.getUid().isBlank()) {
+            return edmentity.getUid();
+        }
+        return "N/A";
     }
 
     private static String generateGroupAccessRequestSubject(Group requestedGroup, String groupId) {

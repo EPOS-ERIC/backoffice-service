@@ -1,18 +1,21 @@
 package org.epos.backoffice.api.util;
 
-import java.util.*;
+import static abstractapis.AbstractRelationsAPI.getDbaccess;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
-import model.MetadataGroupUser;
-import model.RequestStatusType;
 import org.epos.eposdatamodel.DataProduct;
 import org.epos.eposdatamodel.Distribution;
 import org.epos.eposdatamodel.EPOSDataModelEntity;
 import org.epos.eposdatamodel.Group;
 import org.epos.eposdatamodel.LinkedEntity;
 import org.epos.eposdatamodel.User;
-import org.epos.eposdatamodel.UserGroup;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.client.RestTemplate;
@@ -23,11 +26,11 @@ import abstractapis.AbstractAPI;
 import commonapis.LinkedEntityAPI;
 import dao.EposDataModelDAO;
 import metadataapis.EntityNames;
+import model.MetadataGroupUser;
+import model.RequestStatusType;
 import model.RoleType;
 import model.StatusType;
 import usermanagementapis.UserGroupManagementAPI;
-
-import static abstractapis.AbstractRelationsAPI.getDbaccess;
 
 public class EPOSDataModelManager {
 
@@ -236,6 +239,7 @@ public class EPOSDataModelManager {
         if(existingEntity == null) {
             return new ApiResponseMessage(ApiResponseMessage.ERROR, "{\"response\" : \"Entity not found\"}");
         }
+        String originalEditorId = existingEntity.getEditorId();
 
         // Pre-fetch user's group roles once for permission check (optimization)
         final Map<String, String> userGroupRoles = user.getIsAdmin() ? null : getUserAcceptedGroupRoles(user);
@@ -318,6 +322,12 @@ public class EPOSDataModelManager {
 
         if ((currentStatus == StatusType.DRAFT || currentStatus == StatusType.SUBMITTED) && newStatus == StatusType.DISCARDED) {
             LinkedEntity reference = dbapi.create(entityToSave, null, null, null);
+
+            if (currentStatus == StatusType.SUBMITTED) {
+                EPOSDataModelEntity entity = (EPOSDataModelEntity) dbapi.retrieve(reference.getInstanceId());
+                EmailWrapper.wrapPublishedOrDiscarded(entity, originalEditorId, user, entity.getMetaId(), entity.getInstanceId());
+            }
+
             return new ApiResponseMessage(ApiResponseMessage.OK, reference);
         }
 
@@ -365,6 +375,10 @@ public class EPOSDataModelManager {
             //}
             LinkedEntity reference = dbapi.create(entityToSave, null, null, null);
             archiveOldPublishedVersions(dbapi, reference.getMetaId(), reference.getInstanceId());
+
+            EPOSDataModelEntity entity = (EPOSDataModelEntity) dbapi.retrieve(reference.getInstanceId());
+            EmailWrapper.wrapPublishedOrDiscarded(entity, originalEditorId, user, entity.getMetaId(), entity.getInstanceId());
+
             return new ApiResponseMessage(ApiResponseMessage.OK, reference);
         }
 
