@@ -55,26 +55,31 @@ public class ReviewNotificationController extends MetadataAbstractController<Dat
 			@ApiResponse(responseCode = "404", description = "DataProduct not found or access denied"),
 			@ApiResponse(responseCode = "500", description = "Error sending review request")
 	})
-	public ResponseEntity<?> requestReview(@PathVariable String meta_id, @PathVariable String instance_id) {
-		ResponseEntity<?> authResponse = getMethod(meta_id, instance_id, null);
-		if (authResponse.getStatusCode() != HttpStatus.OK) {
-			return authResponse;
-		}
+    public ResponseEntity<?> requestReview(@PathVariable String meta_id, @PathVariable String instance_id) {
+        ResponseEntity<?> authResponse = getMethod(meta_id, instance_id, null);
+        if (authResponse.getStatusCode() != HttpStatus.OK) {
+            return authResponse;
+        }
 
-		org.epos.eposdatamodel.User user = getUserFromSession();
-		if (user == null) {
-			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("User session not found");
-		}
+        org.epos.eposdatamodel.User user = getUserFromSession();
+        if (user == null) {
+            log.warn("Review request rejected: missing session user metaId={} instanceId={}", meta_id, instance_id);
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("User session not found");
+        }
 
-		DataProduct dataProduct = (DataProduct) AbstractAPI.retrieveAPI(EntityNames.DATAPRODUCT.name()).retrieve(instance_id);
+        DataProduct dataProduct = (DataProduct) AbstractAPI.retrieveAPI(EntityNames.DATAPRODUCT.name()).retrieve(instance_id);
 
-		if (dataProduct == null) {
-			return ResponseEntity.status(HttpStatus.NOT_FOUND).body("DataProduct not found");
-		}
+        if (dataProduct == null) {
+            log.warn("Review request rejected: dataProduct not found metaId={} instanceId={} userId={}",
+                    meta_id, instance_id, user.getAuthIdentifier());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("DataProduct not found");
+        }
 
-		if (!StatusType.SUBMITTED.equals(dataProduct.getStatus())) {
-			return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("DataProduct must be in submitted state");
-		}
+        if (!StatusType.SUBMITTED.equals(dataProduct.getStatus())) {
+            log.warn("Review request rejected: invalid status metaId={} instanceId={} status={} userId={}",
+                    meta_id, instance_id, dataProduct.getStatus(), user.getAuthIdentifier());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("DataProduct must be in submitted state");
+        }
 
 		String subject = generateEmailSubject(dataProduct);
 		String body = generateEmailBody(dataProduct, user, meta_id, instance_id);
@@ -86,18 +91,20 @@ public class ReviewNotificationController extends MetadataAbstractController<Dat
                 .pathSegment("Metadata Curators")
                 .build()
                 .toUri();
-		try {
-			HttpHeaders headers = new HttpHeaders();
-			headers.setContentType(MediaType.APPLICATION_JSON);
-			HttpEntity<ReviewEmailRequest> entity = new HttpEntity<>(externalRequest, headers);
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<ReviewEmailRequest> entity = new HttpEntity<>(externalRequest, headers);
 
-			restTemplate.postForEntity(url, entity, Void.class);
-			return ResponseEntity.ok("Review request sent successfully");
-		} catch (Exception e) {
-			log.error("Error calling email-sender-service", e);
-			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error sending review request");
-		}
-	}
+            restTemplate.postForEntity(url, entity, Void.class);
+            log.info("Review request sent metaId={} instanceId={} userId={}", meta_id, instance_id, user.getAuthIdentifier());
+            return ResponseEntity.ok("Review request sent successfully");
+        } catch (Exception e) {
+            log.error("Error calling email-sender-service metaId={} instanceId={} userId={}",
+                    meta_id, instance_id, user.getAuthIdentifier(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error sending review request");
+        }
+    }
 
 	private String generateEmailSubject(DataProduct dataProduct) {
 		return String.format("[EPOS] Review Request: %s", dataProduct.getTitle());

@@ -36,6 +36,8 @@ public abstract class MetadataAbstractController<T extends EPOSDataModelEntity> 
 
 		User user = getUserFromSession();
 		if (user == null) {
+			log.warn("Metadata GET rejected: missing session user entityType={} metaId={} instanceId={}",
+					entityType.getSimpleName(), meta_id, instance_id);
 			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized: User not found in session.");
 		}
 
@@ -48,7 +50,7 @@ public abstract class MetadataAbstractController<T extends EPOSDataModelEntity> 
 		List items = response.getListOfEntities();
 
 		if (items!=null && items.isEmpty()) {
-			log.info("Metadata GET empty result entityType={} metaId={} instanceId={} userId={} diagnostic={}",
+			log.debug("Metadata GET empty result entityType={} metaId={} instanceId={} userId={} diagnostic={}",
 					entityType.getSimpleName(),
 					meta_id,
 					instance_id,
@@ -72,6 +74,7 @@ public abstract class MetadataAbstractController<T extends EPOSDataModelEntity> 
 
 		User user = getUserFromSession();
 		if (user == null) {
+			log.warn("Metadata DELETE rejected: missing session user entityType={} instanceId={}", entityType.getSimpleName(), instance_id);
 			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized: User not found in session.");
 		}
 
@@ -94,6 +97,7 @@ public abstract class MetadataAbstractController<T extends EPOSDataModelEntity> 
 
 		User user = getUserFromSession();
 		if (user == null) {
+			log.warn("Metadata POST rejected: missing session user entityType={}", entityType.getSimpleName());
 			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized: User not found in session.");
 		}
 
@@ -116,6 +120,7 @@ public abstract class MetadataAbstractController<T extends EPOSDataModelEntity> 
 
 		User user = getUserFromSession();
 		if (user == null) {
+			log.warn("Metadata UPDATE rejected: missing session user entityType={}", entityType.getSimpleName());
 			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized: User not found in session.");
 		}
 

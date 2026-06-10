@@ -40,8 +40,11 @@ public class EPOSDataModelManager {
     public static ApiResponseMessage getEPOSDataModelEposDataModelEntity(String meta_id, String instance_id, User user, EntityNames entityNames, Class clazz) {
 
         AbstractAPI dbapi = AbstractAPI.retrieveAPI(entityNames.name());
-        if (meta_id == null)
+        if (meta_id == null) {
+            log.warn("Entity read rejected: missing metaId userId={} entityType={} instanceId={}",
+                    user != null ? user.getAuthIdentifier() : null, entityNames.name(), instance_id);
             return new ApiResponseMessage(ApiResponseMessage.ERROR, "{\"response\" : \"The [meta_id] field can't be left blank\"}");
+        }
         if(instance_id == null) {
             instance_id = "all";
         }
@@ -64,43 +67,43 @@ public class EPOSDataModelManager {
         log.debug("Entity read request userId={} entityType={} metaId={} instanceId={}",
                 userId, entityNames.name(), meta_id, instance_id);
         
-        if (meta_id.equals("all")) {
-            // Retrieve all entities, only filter by user permissions
-            list = dbapi.retrieveAll();
-            int totalEntities = list.size();
-            list = list.stream()
-                    .filter(elem -> checkUserPermissionsReadOnly(elem, user, userGroupRoles))
-                    .collect(Collectors.toList());
-            if (!user.getIsAdmin()) {
-                log.info("Entity read filtered userId={} entityType={} metaId={} instanceId={} total={} visible={} userAcceptedGroups={}",
-                        userId, entityNames.name(), meta_id, instance_id, totalEntities, list.size(), userGroupRoles);
-            }
-        } else {
-            if(instance_id.equals("all")) {
-                // Retrieve all instances for a specific meta_id
+	        if (meta_id.equals("all")) {
+	            // Retrieve all entities, only filter by user permissions
+	            list = dbapi.retrieveAll();
+	            int totalEntities = list.size();
+	            list = list.stream()
+	                    .filter(elem -> checkUserPermissionsReadOnly(elem, user, userGroupRoles))
+	                    .collect(Collectors.toList());
+	            if (!user.getIsAdmin()) {
+	                log.debug("Entity read filtered userId={} entityType={} metaId={} instanceId={} total={} visible={} userAcceptedGroups={}",
+	                        userId, entityNames.name(), meta_id, instance_id, totalEntities, list.size(), userGroupRoles);
+	            }
+	        } else {
+	            if(instance_id.equals("all")) {
+	                // Retrieve all instances for a specific meta_id
                 list = dbapi.retrieveAll();
                 int totalEntities = list.size();
-                list = list.stream()
-                        .filter(elem -> elem.getMetaId().equals(meta_id))
-                        .filter(elem -> checkUserPermissionsReadOnly(elem, user, userGroupRoles))
-                        .collect(Collectors.toList());
-                if (!user.getIsAdmin()) {
-                    log.info("Entity read filtered userId={} entityType={} metaId={} instanceId={} total={} visible={} userAcceptedGroups={}",
-                            userId, entityNames.name(), meta_id, instance_id, totalEntities, list.size(), userGroupRoles);
-                }
-            } else {
-                // Retrieve a specific instance
-                list = new ArrayList<>();
-                EPOSDataModelEntity entity = (EPOSDataModelEntity) dbapi.retrieve(instance_id);
-                if (entity == null) {
-                    log.info("Entity read empty userId={} entityType={} metaId={} instanceId={} reason=INSTANCE_ID_NOT_FOUND",
-                            userId, entityNames.name(), meta_id, instance_id);
-                } else if (!entity.getMetaId().equals(meta_id)) {
-                    log.info("Entity read empty userId={} entityType={} metaId={} instanceId={} reason=META_INSTANCE_MISMATCH actualMetaId={}",
-                            userId, entityNames.name(), meta_id, instance_id, entity.getMetaId());
-                } else if (checkUserPermissionsReadOnly(entity, user, userGroupRoles)) {
-                    list.add(entity);
-                } else {
+	                list = list.stream()
+	                        .filter(elem -> elem.getMetaId().equals(meta_id))
+	                        .filter(elem -> checkUserPermissionsReadOnly(elem, user, userGroupRoles))
+	                        .collect(Collectors.toList());
+	                if (!user.getIsAdmin()) {
+	                    log.debug("Entity read filtered userId={} entityType={} metaId={} instanceId={} total={} visible={} userAcceptedGroups={}",
+	                            userId, entityNames.name(), meta_id, instance_id, totalEntities, list.size(), userGroupRoles);
+	                }
+	            } else {
+	                // Retrieve a specific instance
+	                list = new ArrayList<>();
+	                EPOSDataModelEntity entity = (EPOSDataModelEntity) dbapi.retrieve(instance_id);
+	                if (entity == null) {
+	                    log.debug("Entity read empty userId={} entityType={} metaId={} instanceId={} reason=INSTANCE_ID_NOT_FOUND",
+	                            userId, entityNames.name(), meta_id, instance_id);
+	                } else if (!entity.getMetaId().equals(meta_id)) {
+	                    log.debug("Entity read empty userId={} entityType={} metaId={} instanceId={} reason=META_INSTANCE_MISMATCH actualMetaId={}",
+	                            userId, entityNames.name(), meta_id, instance_id, entity.getMetaId());
+	                } else if (checkUserPermissionsReadOnly(entity, user, userGroupRoles)) {
+	                    list.add(entity);
+	                } else {
                     log.warn("Entity read denied userId={} entityType={} metaId={} instanceId={} status={} entityGroups={} userAcceptedGroups={}",
                             userId,
                             entityNames.name(),
@@ -133,26 +136,32 @@ public class EPOSDataModelManager {
         EPOSDataModelEntity existingEntity = null;
         if(obj.getInstanceId() != null) {
             existingEntity = (EPOSDataModelEntity) dbapi.retrieve(obj.getInstanceId());
-            if(existingEntity != null) {
+	                if(existingEntity != null) {
                 // Check if user can READ the existing entity (to copy from it)
                 if(!checkUserPermissionsReadOnly(existingEntity, user, userGroupRoles)) {
+                    log.warn("Entity create rejected: source entity unreadable userId={} entityType={} sourceInstanceId={} metaId={}",
+                            userId, entityNames.name(), existingEntity.getInstanceId(), existingEntity.getMetaId());
                     return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "{\"response\" : \"The user can't read the source entity\"}");
                 }
-                // Inherit groups from existing entity if not specified
-                if(obj.getGroups() == null || obj.getGroups().isEmpty()) {
-                    obj.setGroups(existingEntity.getGroups());
-                    log.info("Entity create inheriting groups userId={} entityType={} sourceInstanceId={} inheritedGroups={}",
-                            userId, entityNames.name(), existingEntity.getInstanceId(), existingEntity.getGroups());
-                }
+	                // Inherit groups from existing entity if not specified
+	                if(obj.getGroups() == null || obj.getGroups().isEmpty()) {
+	                    obj.setGroups(existingEntity.getGroups());
+	                    log.debug("Entity create inheriting groups userId={} entityType={} sourceInstanceId={} inheritedGroups={}",
+	                            userId, entityNames.name(), existingEntity.getInstanceId(), existingEntity.getGroups());
+	                }
                 // Set the target status for the new entity (default DRAFT)
                 obj.setStatus(obj.getStatus() == null ? StatusType.DRAFT : obj.getStatus());
                 if (obj.getStatus() == StatusType.DRAFT
                         && hasDraftForUserAndMeta(dbapi, existingEntity.getMetaId(), user.getAuthIdentifier(), null)) {
+                    log.warn("Entity create rejected: duplicate draft userId={} entityType={} metaId={} sourceInstanceId={}",
+                            userId, entityNames.name(), existingEntity.getMetaId(), existingEntity.getInstanceId());
                     return new ApiResponseMessage(ApiResponseMessage.ERROR,
                             "{\"response\" : \"A user can have only one DRAFT for the same entity\"}");
                 }
                 // Check if user can CREATE the new entity with the target status
                 if(!checkUserPermissionsReadWrite(obj, user, userGroupRoles)) {
+                    log.warn("Entity create rejected: status not allowed userId={} entityType={} metaId={} instanceId={} status={}",
+                            userId, entityNames.name(), obj.getMetaId(), obj.getInstanceId(), obj.getStatus());
                     return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "{\"response\" : \"The user can't create an entity with this status\"}");
                 }
             }
@@ -181,6 +190,8 @@ public class EPOSDataModelManager {
         if(existingEntity == null) {
             obj.setStatus(obj.getStatus() == null ? StatusType.DRAFT : obj.getStatus());
             if(!checkUserPermissionsReadWrite(obj, user, userGroupRoles)) {
+                log.warn("Entity create rejected: status not allowed userId={} entityType={} metaId={} instanceId={} status={}",
+                        userId, entityNames.name(), obj.getMetaId(), obj.getInstanceId(), obj.getStatus());
                 return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "{\"response\" : \"The user can't create an entity with this status\"}");
             }
         }
@@ -232,11 +243,15 @@ public class EPOSDataModelManager {
         String userId = user != null ? user.getAuthIdentifier() : null;
 
         if (obj.getInstanceId() == null) {
+            log.warn("Entity update rejected: missing instanceId userId={} entityType={} metaId={}",
+                    userId, entityNames.name(), obj.getMetaId());
             return new ApiResponseMessage(ApiResponseMessage.ERROR, "{\"response\" : \"InstanceId required for update\"}");
         }
 
         EPOSDataModelEntity existingEntity = (EPOSDataModelEntity) dbapi.retrieve(obj.getInstanceId());
         if(existingEntity == null) {
+            log.warn("Entity update rejected: not found userId={} entityType={} instanceId={}",
+                    userId, entityNames.name(), obj.getInstanceId());
             return new ApiResponseMessage(ApiResponseMessage.ERROR, "{\"response\" : \"Entity not found\"}");
         }
         String originalEditorId = existingEntity.getEditorId();
@@ -245,6 +260,8 @@ public class EPOSDataModelManager {
         final Map<String, String> userGroupRoles = user.getIsAdmin() ? null : getUserAcceptedGroupRoles(user);
 
         if(!checkUserPermissionsReadWrite(existingEntity, user, userGroupRoles)) {
+            log.warn("Entity update rejected: unauthorized userId={} entityType={} metaId={} instanceId={} currentStatus={}",
+                    userId, entityNames.name(), existingEntity.getMetaId(), existingEntity.getInstanceId(), existingEntity.getStatus());
             return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "{\"response\" : \"The user can't manage this action\"}");
         }
 
@@ -296,6 +313,8 @@ public class EPOSDataModelManager {
             // Different user trying to modify someone else's DRAFT -> Create NEW DRAFT
             // This allows multiple users to have their own DRAFTs of the same entity
             if (hasDraftForUserAndMeta(dbapi, existingEntity.getMetaId(), user.getAuthIdentifier(), null)) {
+                log.warn("Entity update rejected: duplicate draft userId={} entityType={} metaId={} instanceId={}",
+                        userId, entityNames.name(), existingEntity.getMetaId(), existingEntity.getInstanceId());
                 return new ApiResponseMessage(ApiResponseMessage.ERROR,
                         "{\"response\" : \"A user can have only one DRAFT for the same entity\"}");
             }
@@ -334,6 +353,8 @@ public class EPOSDataModelManager {
         // PUBLISHED -> any other modification: Create new DRAFT version
         if (currentStatus == StatusType.PUBLISHED && newStatus != StatusType.ARCHIVED && newStatus != StatusType.DISCARDED) {
             if (hasDraftForUserAndMeta(dbapi, existingEntity.getMetaId(), user.getAuthIdentifier(), null)) {
+                log.warn("Entity update rejected: duplicate draft userId={} entityType={} metaId={} instanceId={}",
+                        userId, entityNames.name(), existingEntity.getMetaId(), existingEntity.getInstanceId());
                 return new ApiResponseMessage(ApiResponseMessage.ERROR,
                         "{\"response\" : \"A user can have only one DRAFT for the same entity\"}");
             }
@@ -384,9 +405,13 @@ public class EPOSDataModelManager {
 
         // ARCHIVED -> any: Not allowed (ARCHIVED entities are read-only)
         if (currentStatus == StatusType.ARCHIVED) {
+            log.warn("Entity update rejected: archived entity userId={} entityType={} metaId={} instanceId={}",
+                    userId, entityNames.name(), existingEntity.getMetaId(), existingEntity.getInstanceId());
             return new ApiResponseMessage(ApiResponseMessage.ERROR, "{\"response\" : \"Cannot modify ARCHIVED entity. ARCHIVED entities are read-only.\"}");
         }
 
+        log.warn("Entity update rejected: invalid transition userId={} entityType={} metaId={} instanceId={} currentStatus={} newStatus={}",
+                userId, entityNames.name(), existingEntity.getMetaId(), existingEntity.getInstanceId(), currentStatus, newStatus);
         return new ApiResponseMessage(ApiResponseMessage.ERROR, "{\"response\" : \"Invalid status transition from " + currentStatus + " to " + newStatus+"\"}");
     }
 
@@ -809,17 +834,32 @@ public class EPOSDataModelManager {
     public static ApiResponseMessage deleteEposDataModelEntity(String instance_id, User user, EntityNames entityNames, Class clazz) {
         EposDataModelDAO.getInstance().clearAllCaches();
         AbstractAPI dbapi = AbstractAPI.retrieveAPI(entityNames.name());
+        String userId = user != null ? user.getAuthIdentifier() : null;
+
+        log.debug("Entity delete request userId={} entityType={} instanceId={}", userId, entityNames.name(), instance_id);
         
         EPOSDataModelEntity existingEntity = (EPOSDataModelEntity) dbapi.retrieve(instance_id);
         if(existingEntity == null) {
+            log.warn("Entity delete rejected: not found userId={} entityType={} instanceId={}", userId, entityNames.name(), instance_id);
             return new ApiResponseMessage(ApiResponseMessage.ERROR, "Entity not found");
         }
         
         if(!checkUserPermissionsReadWrite(existingEntity, user)) {
+            log.warn("Entity delete denied userId={} entityType={} instanceId={} status={} groups={}",
+                    userId,
+                    entityNames.name(),
+                    instance_id,
+                    existingEntity.getStatus(),
+                    existingEntity.getGroups());
             return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "The user can't delete this entity");
         }
         
         dbapi.delete(instance_id);
+        log.info("Entity deleted userId={} entityType={} metaId={} instanceId={}",
+                userId,
+                entityNames.name(),
+                existingEntity.getMetaId(),
+                instance_id);
         return new ApiResponseMessage(ApiResponseMessage.OK, "Entity deleted successfully");
     }
 

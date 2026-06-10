@@ -66,7 +66,7 @@ public class DistributionPluginController extends MetadataAbstractController<Dis
             ResponseEntity<String> proxyResponse = restTemplate.exchange(url, HttpMethod.GET, null, String.class);
             return proxyResponse;
         } catch (Exception e) {
-            log.error("Error proxying to converter-service: {}", e.getMessage());
+            log.error("Error proxying plugin info metaId={} instanceId={}", meta_id, instance_id, e);
             return ResponseEntity.status(500).body("Error retrieving plugin information: " + e.getMessage());
         }
     }
@@ -92,9 +92,10 @@ public class DistributionPluginController extends MetadataAbstractController<Dis
                 + instance_id;
         try {
             ResponseEntity<String> proxyResponse = restTemplate.exchange(url, HttpMethod.DELETE, null, String.class);
+            log.info("Plugin relations deleted metaId={} instanceId={}", meta_id, instance_id);
             return proxyResponse;
         } catch (Exception e) {
-            log.error("Error proxying to converter-service: {}", e.getMessage());
+            log.error("Error deleting plugin relations metaId={} instanceId={}", meta_id, instance_id, e);
             return ResponseEntity.status(500).body("Error deleting plugin relations: " + e.getMessage());
         }
     }
@@ -120,11 +121,17 @@ public class DistributionPluginController extends MetadataAbstractController<Dis
 
         org.epos.eposdatamodel.User user = getUserFromSession();
         if (user == null) {
+            log.warn("Plugin email rejected: missing session user metaId={} instanceId={}", meta_id, instance_id);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("{\"response\":\"User session not found\"}");
         }
 
         Distribution distribution = (Distribution) AbstractAPI.retrieveAPI(EntityNames.DISTRIBUTION.name())
                 .retrieve(instance_id);
+        if (distribution == null) {
+            log.warn("Plugin email rejected: distribution not found metaId={} instanceId={} userId={}",
+                    meta_id, instance_id, user.getAuthIdentifier());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("{ \"response\": \"Distribution not found\" }");
+        }
 
         String subject = "[EPOS] Notification for Distribution " + instance_id;
         StringBuilder bodyBuilder = new StringBuilder();
@@ -152,9 +159,11 @@ public class DistributionPluginController extends MetadataAbstractController<Dis
             HttpEntity<ExternalEmailRequest> entity = new HttpEntity<>(externalRequest, headers);
 
             restTemplate.postForEntity(url, entity, Void.class);
+            log.info("Plugin email sent metaId={} instanceId={} userId={}", meta_id, instance_id, user.getAuthIdentifier());
             return ResponseEntity.ok("{ \"response\": \"Email sent successfully\"}");
         } catch (Exception e) {
-            log.error("Error calling email-sender-service: {}", e.getMessage());
+            log.error("Error calling email-sender-service metaId={} instanceId={} userId={}",
+                    meta_id, instance_id, user.getAuthIdentifier(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("{ \"response\": \"error sending email: " + e.getMessage() + "\"}");
         }

@@ -7,6 +7,8 @@ import org.epos.backoffice.api.util.ApiResponseMessage;
 import org.epos.backoffice.api.util.EPOSDataModelManager;
 import org.epos.eposdatamodel.EPOSDataModelEntity;
 import org.epos.eposdatamodel.User;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -15,6 +17,7 @@ import java.util.List;
 
 public abstract class ManagementAbstractController<T> extends BasicController<T> {
 
+	private static final Logger log = LoggerFactory.getLogger(ManagementAbstractController.class);
 	protected static AbstractAPI dbapi;
 
 	public ManagementAbstractController(ObjectMapper objectMapper, HttpServletRequest request, Class<T> entityType) {
@@ -31,6 +34,11 @@ public abstract class ManagementAbstractController<T> extends BasicController<T>
 		}
 
 		User user = getUserFromSession();
+		if (user == null) {
+			log.warn("Management GET rejected: missing session user entityType={} metaId={} instanceId={}",
+					entityType.getSimpleName(), meta_id, instance_id);
+			return ResponseEntity.status(401).body("Unauthorized: User not found in session.");
+		}
 
 		List<T> revertedList = new ArrayList<>();
 		List<T> list = new ArrayList<T>();
@@ -44,8 +52,11 @@ public abstract class ManagementAbstractController<T> extends BasicController<T>
 
 		list.forEach(e -> revertedList.add(0, e));
 
-		if (list.isEmpty())
+		if (list.isEmpty()) {
+			log.debug("Management GET empty result entityType={} metaId={} instanceId={} userId={}",
+					entityType.getSimpleName(), meta_id, instance_id, user.getAuthIdentifier());
 			return ResponseEntity.status(404).body("[]");
+		}
 
 		return ResponseEntity
 				.status(200)
@@ -62,6 +73,7 @@ public abstract class ManagementAbstractController<T> extends BasicController<T>
 
 		User user = getUserFromSession();
 		if (user == null) {
+			log.warn("Management DELETE rejected: missing session user entityType={} instanceId={}", entityType.getSimpleName(), instance_id);
 			return ResponseEntity.status(401).body("Unauthorized: User not found in session.");
 		}
 
@@ -84,6 +96,7 @@ public abstract class ManagementAbstractController<T> extends BasicController<T>
 
 		User user = getUserFromSession();
 		if (user == null) {
+			log.warn("Management POST rejected: missing session user entityType={}", entityType.getSimpleName());
 			return ResponseEntity.status(401).body("Unauthorized: User not found in session.");
 		}
 
@@ -106,6 +119,7 @@ public abstract class ManagementAbstractController<T> extends BasicController<T>
 
 		User user = getUserFromSession();
 		if (user == null) {
+			log.warn("Management UPDATE rejected: missing session user entityType={}", entityType.getSimpleName());
 			return ResponseEntity.status(401).body("Unauthorized: User not found in session.");
 		}
 

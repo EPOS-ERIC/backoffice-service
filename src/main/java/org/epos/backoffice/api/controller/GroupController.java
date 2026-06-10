@@ -8,8 +8,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import org.epos.backoffice.api.util.*;
 import org.epos.eposdatamodel.Group;
 import org.epos.eposdatamodel.User;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,8 +15,6 @@ import jakarta.servlet.http.HttpServletRequest;
 
 @RestController
 public class GroupController extends ManagementAbstractController<Group> implements ApiUserGroupDocTag {
-
-	private static final Logger log = LoggerFactory.getLogger(GroupController.class);
 
 	@org.springframework.beans.factory.annotation.Autowired
 	public GroupController(ObjectMapper objectMapper, HttpServletRequest request) {
@@ -42,10 +38,6 @@ public class GroupController extends ManagementAbstractController<Group> impleme
 			@RequestBody Group body
 			) {
 		User user = getUserFromSession();
-		
-		System.out.println("Session User: "+user.toString());
-
-		
 		ApiResponseMessage response = GroupManager.updateGroup(body, user);
 		if(response.getCode()!=4) return ResponseEntity.status(400).body(response);
 
@@ -72,8 +64,6 @@ public class GroupController extends ManagementAbstractController<Group> impleme
 			) {
 
 		User user = getUserFromSession();
-
-		System.out.println("Session User: "+user.toString());
 
 		ApiResponseMessage response = GroupManager.createGroup(body, user);
 		if(response.getCode()!=4) return ResponseEntity.status(400).body(response);
@@ -106,8 +96,6 @@ public class GroupController extends ManagementAbstractController<Group> impleme
 					.body(new ApiResponseMessage(1, "The [instance_id] field can't be left blank"));
 
 		User user = getUserFromSession();
-
-		System.out.println("Session User: "+user.toString());
 		
 		ApiResponseMessage response = GroupManager.getGroup(instance_id, user, available_section);
 		if(response.getCode()==6) return ResponseEntity.status(403).body(response);
@@ -136,8 +124,6 @@ public class GroupController extends ManagementAbstractController<Group> impleme
 			) {
 		User user = getUserFromSession();
 
-		System.out.println("Session User: "+user.toString());
-
 		ApiResponseMessage response = GroupManager.deleteGroup(instance_id, user);
 		if(response.getCode()!=4) return ResponseEntity.status(400).body(response);
 
@@ -163,9 +149,6 @@ public class GroupController extends ManagementAbstractController<Group> impleme
 			@RequestBody AddUserToGroupBean addUserToGroupBean
 	) {
 		User user = getUserFromSession();
-		System.out.println("Session User: "+ user.toString());
-
-		System.out.println(addUserToGroupBean.toString());
 
 		ApiResponseMessage response = UserManager.addUserToGroup(addUserToGroupBean, user);
 		if(response.getCode()!=4) return ResponseEntity.status(400).body(response);
@@ -192,7 +175,6 @@ public class GroupController extends ManagementAbstractController<Group> impleme
 			@RequestBody AddUserToGroupBean addUserToGroupBean
 	) {
 		User user = getUserFromSession();
-		System.out.println("Session User: "+ user.toString());
 
 		ApiResponseMessage response = UserManager.updateUserToGroup(addUserToGroupBean, user);
 		if(response.getCode()!=4) return ResponseEntity.status(400).body(response);
@@ -219,8 +201,6 @@ public class GroupController extends ManagementAbstractController<Group> impleme
 			@RequestBody RemoveUserFromGroupBean removeUserFromGroupBean
 	) {
 		User user = getUserFromSession();
-		System.out.println("Session User: "+ user.toString());
-		System.out.println("DEBUG: "+removeUserFromGroupBean);
 
 		ApiResponseMessage response = UserManager.removeUserFromGroup(removeUserFromGroupBean, user);
 		if(response.getCode()!=4) return ResponseEntity.status(400).body(response);
@@ -248,9 +228,6 @@ public class GroupController extends ManagementAbstractController<Group> impleme
 			@RequestBody AddEntityToGroupBean addEntityToGroupBean
 	) {
 		User user = getUserFromSession();
-		System.out.println("Session User: "+ user.toString());
-
-		System.out.println(addEntityToGroupBean.toString());
 
 		ApiResponseMessage response = GroupManager.addEntityToGroup(addEntityToGroupBean, user);
 		if(response.getCode()!=4) return ResponseEntity.status(400).body(response);
@@ -277,7 +254,6 @@ public class GroupController extends ManagementAbstractController<Group> impleme
 			@RequestBody AddEntityToGroupBean addEntityToGroupBean
 	) {
 		User user = getUserFromSession();
-		System.out.println("Session User: "+ user.toString());
 
 		ApiResponseMessage response = GroupManager.removeEntityFromGroup(addEntityToGroupBean, user);
 		if(response.getCode()!=4) return ResponseEntity.status(400).body(response);

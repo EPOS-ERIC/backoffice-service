@@ -74,7 +74,7 @@ public class AdminUserGroupSyncScheduler {
                 .collect(Collectors.toList());
 
         if (adminUsers.isEmpty()) {
-            LOG.debug("[AdminUserGroupSyncScheduler] No admin users found.");
+            LOG.warn("[AdminUserGroupSyncScheduler] No admin users found.");
             return 0;
         }
 
@@ -82,7 +82,7 @@ public class AdminUserGroupSyncScheduler {
         List<MetadataGroup> allGroups = (List<MetadataGroup>) dbAccess.getAllFromDB(MetadataGroup.class);
 
         if (allGroups.isEmpty()) {
-            LOG.debug("[AdminUserGroupSyncScheduler] No groups found.");
+            LOG.warn("[AdminUserGroupSyncScheduler] No groups found.");
             return 0;
         }
 

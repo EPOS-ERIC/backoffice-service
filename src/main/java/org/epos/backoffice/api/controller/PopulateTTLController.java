@@ -51,7 +51,6 @@ public class PopulateTTLController implements ApiDocTag {
 	public PopulateTTLController(RestTemplate restTemplate, HttpServletRequest request) {
 		this.restTemplate = restTemplate;
 		this.request = request;
-		log.info("PopulateTTLController initialized");
 	}
 
 	@PostMapping
@@ -103,6 +102,9 @@ public class PopulateTTLController implements ApiDocTag {
 					.body("Unauthorized: User does not have sufficient permissions for this metadata group.");
 		}
 
+		log.debug("populateTTL request userId={} type={} model={} mapping={} metadataGroup={} pathProvided={}",
+				user.getAuthIdentifier(), type, model, mapping, metadataGroup, path != null);
+
 		UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromUriString(INGESTOR_SERVICE_BASE_URL + "populate")
 				.queryParam("type", type)
 				.queryParam("model", model)
@@ -130,10 +132,12 @@ public class PopulateTTLController implements ApiDocTag {
 		try {
 			ResponseEntity<String> result = restTemplate.exchange(uri, HttpMethod.POST, requestEntity, String.class);
 			EposDataModelDAO.getInstance().clearAllCaches();
-			log.info("populateTTL request successful, caches cleared");
+			log.info("populateTTL request successful, caches cleared userId={} type={} model={} mapping={} metadataGroup={}",
+					user.getAuthIdentifier(), type, model, mapping, metadataGroup);
 			return result;
 		} catch (Exception e) {
-			log.error("Error forwarding populateTTL request: {}", e.getMessage());
+			log.error("Error forwarding populateTTL request userId={} type={} model={} mapping={} metadataGroup={}",
+					user.getAuthIdentifier(), type, model, mapping, metadataGroup, e);
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
 					.body("Error forwarding request: " + e.getMessage());
 		}
