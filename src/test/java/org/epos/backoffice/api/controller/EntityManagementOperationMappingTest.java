@@ -1,19 +1,22 @@
 package org.epos.backoffice.api.controller;
 
-import abstractapis.AbstractAPI;
-import commonapis.LinkedEntityAPI;
-import metadataapis.EntityNames;
-import model.StatusType;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
+import java.util.List;
+
 import org.epos.backoffice.api.util.EPOSDataModelManager;
 import org.epos.backoffice.api.util.UserManager;
-import org.epos.eposdatamodel.*;
+import org.epos.eposdatamodel.LinkedEntity;
+import org.epos.eposdatamodel.Mapping;
+import org.epos.eposdatamodel.Operation;
+import org.epos.eposdatamodel.User;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 
-import java.util.List;
-import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.*;
+import commonapis.LinkedEntityAPI;
+import metadataapis.EntityNames;
+import model.StatusType;
 
 public class EntityManagementOperationMappingTest extends TestcontainersLifecycle {
 
@@ -44,12 +47,6 @@ public class EntityManagementOperationMappingTest extends TestcontainersLifecycl
         operation.setReturns(List.of("application/json"));
         operation.setStatus(StatusType.DRAFT);
 
-        LinkedEntity operationLinkedEntity = EPOSDataModelManager.createEposDataModelEntity(operation, user, EntityNames.OPERATION, Operation.class).getEntity();
-
-        operation.setInstanceId(operationLinkedEntity.getInstanceId());
-        operation.setMetaId(operationLinkedEntity.getMetaId());
-        operation.setUid(operationLinkedEntity.getUid());
-
         Mapping mapping1 = new Mapping();
         mapping1.setVariable("test1");
         mapping1.setLabel("label1");
@@ -57,14 +54,10 @@ public class EntityManagementOperationMappingTest extends TestcontainersLifecycl
 
         LinkedEntity mapping1LinkedEntity = EPOSDataModelManager.createEposDataModelEntity(mapping1, user, EntityNames.MAPPING, Mapping.class).getEntity();
 
-        mapping1.setInstanceId(operationLinkedEntity.getInstanceId());
-        mapping1.setMetaId(operationLinkedEntity.getMetaId());
-        mapping1.setUid(operationLinkedEntity.getUid());
-
         operation.setMapping(List.of(mapping1LinkedEntity));
 
         System.out.println(operation);
-        operationLinkedEntity = EPOSDataModelManager.createEposDataModelEntity(operation, user, EntityNames.OPERATION, Operation.class).getEntity();
+        LinkedEntity operationLinkedEntity = EPOSDataModelManager.createEposDataModelEntity(operation, user, EntityNames.OPERATION, Operation.class).getEntity();
 
         assertEquals(1, ((Operation)LinkedEntityAPI.retrieveFromLinkedEntity(operationLinkedEntity)).getMapping().size());
 

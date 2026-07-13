@@ -726,6 +726,69 @@ public class EPOSDataModelManager {
         }
     }
 
+    /**
+     * Checks if a user can DELETE an entity.
+     */
+    private static boolean checkUserPermissionsDelete(EPOSDataModelEntity obj, User user) {
+        if (user.getIsAdmin()) {
+            return true;
+        }
+        return checkUserPermissionsDelete(obj, user, getUserAcceptedGroupRoles(user));
+    }
+
+    /**
+     * Checks if a user can DELETE an entity using pre-fetched user group roles.
+     */
+    private static boolean checkUserPermissionsDelete(EPOSDataModelEntity obj, User user, Map<String, String> userGroupRoles) {
+        // Backoffice admin has full access to everything
+        if (user.getIsAdmin()) {
+            return true;
+        }
+
+        // Entities without groups are only accessible to backoffice admins
+        if (obj.getGroups() == null || obj.getGroups().isEmpty()) {
+            return false;
+        }
+
+        // Get user's role in the entity's groups using pre-fetched map
+        String userRole = getUserRoleInEntityGroups(obj, userGroupRoles);
+
+        // No membership in entity's groups = external user = no access
+        if (userRole == null) {
+            return false;
+        }
+
+        // Group ADMIN has full access within their groups
+        if (RoleType.ADMIN.name().equals(userRole)) {
+            return true;
+        }
+
+        // Check if user is the owner (for "self" permissions)
+        boolean isOwner = user.getAuthIdentifier() != null &&
+                          user.getAuthIdentifier().equals(obj.getEditorId());
+
+        StatusType status = obj.getStatus();
+        if (status == null) {
+            status = StatusType.DRAFT;
+        }
+
+        switch (status) {
+            case DRAFT:
+                return RoleType.EDITOR.name().equals(userRole);
+
+            case SUBMITTED:
+                return RoleType.REVIEWER.name().equals(userRole)
+                        || (RoleType.EDITOR.name().equals(userRole) && isOwner);
+
+            case PUBLISHED:
+            case DISCARDED:
+                return RoleType.REVIEWER.name().equals(userRole);
+
+            default:
+                return false;
+        }
+    }
+
     private static boolean hasReviewerRole(User user, EPOSDataModelEntity obj) {
         if(obj.getGroups() != null && !obj.getGroups().isEmpty()){
             for(String groupid : obj.getGroups()){
@@ -804,7 +867,7 @@ public class EPOSDataModelManager {
             return new ApiResponseMessage(ApiResponseMessage.ERROR, "Entity not found");
         }
         
-        if(!checkUserPermissionsReadWrite(existingEntity, user)) {
+        if(!checkUserPermissionsDelete(existingEntity, user)) {
             log.warn("Entity delete denied userId={} entityType={} instanceId={} status={} groups={}",
                     userId,
                     entityNames.name(),
