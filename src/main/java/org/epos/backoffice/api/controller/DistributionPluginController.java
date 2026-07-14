@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -65,6 +66,10 @@ public class DistributionPluginController extends MetadataAbstractController<Dis
         try {
             ResponseEntity<String> proxyResponse = restTemplate.exchange(url, HttpMethod.GET, null, String.class);
             return proxyResponse;
+        } catch (ResourceAccessException e) {
+            log.warn("Converter service unavailable while proxying plugin info metaId={} instanceId={} reason={}",
+                    meta_id, instance_id, e.getMessage());
+            return ResponseEntity.status(500).body("Error retrieving plugin information: " + e.getMessage());
         } catch (Exception e) {
             log.error("Error proxying plugin info metaId={} instanceId={}", meta_id, instance_id, e);
             return ResponseEntity.status(500).body("Error retrieving plugin information: " + e.getMessage());
