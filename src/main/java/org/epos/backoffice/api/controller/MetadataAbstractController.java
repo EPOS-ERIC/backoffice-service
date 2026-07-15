@@ -49,14 +49,18 @@ public abstract class MetadataAbstractController<T extends EPOSDataModelEntity> 
 				entityType);
 		List items = response.getListOfEntities();
 
-		if (items!=null && items.isEmpty()) {
-			log.debug("Metadata GET empty result entityType={} metaId={} instanceId={} userId={} diagnostic={}",
-					entityType.getSimpleName(),
-					meta_id,
-					instance_id,
-					user.getAuthIdentifier(),
-					response.getMessage());
-			return ResponseEntity.status(404).body(new ArrayList<>());
+		if (items != null && items.isEmpty() && "all".equals(instance_id)) {
+			if ("all".equals(instance_id)) {
+				log.debug("Metadata GET empty result entityType={} metaId={} instanceId={} userId={} diagnostic={}",
+						entityType.getSimpleName(),
+						meta_id,
+						instance_id,
+						user.getAuthIdentifier(),
+						response.getMessage());
+				return ResponseEntity.status(HttpStatus.OK).body(new ArrayList<>());
+			} else {
+				return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ArrayList<>());
+			}
 		}
 
 		return ResponseEntity
