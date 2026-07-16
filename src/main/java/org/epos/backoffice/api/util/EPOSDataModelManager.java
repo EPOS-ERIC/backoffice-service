@@ -930,13 +930,15 @@ public class EPOSDataModelManager {
 								}
 							}
 						} catch (Exception e) {
-							log.error("Failed to associate plugins for distribution {}: {}", newDistribution.getInstanceId(), e.getMessage(), e);
+							log.warn("Failed to associate plugins for distribution {}: {}",
+									newDistribution.getInstanceId(), e.getMessage());
 						}
 					}
 				}
 			}
 		} catch (Exception e) {
-			log.error("Failed to associate plugins for distribution {}: {}", newDataProductLinkedEntity.getInstanceId(), e.getMessage(), e);
+			log.warn("Failed to associate plugins for distribution {}: {}",
+					newDataProductLinkedEntity.getInstanceId(), e.getMessage());
 		}
 	}
 
