@@ -30,6 +30,7 @@ import model.MetadataGroupUser;
 import model.RequestStatusType;
 import model.RoleType;
 import model.StatusType;
+import model.Versioningstatus;
 import usermanagementapis.UserGroupManagementAPI;
 
 public class EPOSDataModelManager {
@@ -156,7 +157,7 @@ public class EPOSDataModelManager {
                 // Set the target status for the new entity (default DRAFT)
                 obj.setStatus(obj.getStatus() == null ? StatusType.DRAFT : obj.getStatus());
                 if (obj.getStatus() == StatusType.DRAFT
-                        && hasDraftForUserAndMeta(dbapi, existingEntity.getMetaId(), user.getAuthIdentifier(), null)) {
+                        && findDraftForUserAndMeta(existingEntity.getMetaId(), user.getAuthIdentifier()) != null) {
                     log.warn("Entity create rejected: duplicate draft userId={} entityType={} metaId={} sourceInstanceId={}",
                             userId, entityNames.name(), existingEntity.getMetaId(), existingEntity.getInstanceId());
                     return new ApiResponseMessage(ApiResponseMessage.ERROR,
@@ -258,7 +259,14 @@ public class EPOSDataModelManager {
                     userId, entityNames.name(), obj.getInstanceId());
             return new ApiResponseMessage(ApiResponseMessage.ERROR, "{\"response\" : \"Entity not found\"}");
         }
-        String originalEditorId = existingEntity.getEditorId();
+        Object persistedVersionObject = getDbaccess()
+                .getOneFromDBByInstanceIdNoCache(obj.getInstanceId(), Versioningstatus.class)
+                .stream()
+                .findFirst()
+                .orElse(null);
+        Versioningstatus persistedVersion = (Versioningstatus) persistedVersionObject;
+        String originalEditorId = persistedVersion != null
+                ? persistedVersion.getEditorId() : existingEntity.getEditorId();
 
         // Pre-fetch user's group roles once for permission check (optimization)
         final Map<String, String> userGroupRoles = user.getIsAdmin() ? null : getUserAcceptedGroupRoles(user);
@@ -269,10 +277,20 @@ public class EPOSDataModelManager {
             return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "{\"response\" : \"The user can't manage this action\"}");
         }
 
-        StatusType currentStatus = existingEntity.getStatus();
+        StatusType currentStatus = persistedVersion != null && persistedVersion.getStatus() != null
+                ? StatusType.valueOf(persistedVersion.getStatus()) : existingEntity.getStatus();
         StatusType newStatus = obj.getStatus() != null ? obj.getStatus() : StatusType.DRAFT;
 
-        EPOSDataModelEntity entityToSave = (obj.getUid() == null) ? existingEntity : obj;
+        // A lifecycle request commonly carries only identity fields and status.
+        // Never let that sparse DTO replace the persisted draft: db-api treats
+        // absent values as removals while synchronizing metadata relations.
+        boolean statusOnlyTransition = (currentStatus == StatusType.DRAFT
+                && (newStatus == StatusType.SUBMITTED || newStatus == StatusType.DISCARDED))
+                || (currentStatus == StatusType.SUBMITTED
+                && (newStatus == StatusType.PUBLISHED || newStatus == StatusType.DISCARDED))
+                || (currentStatus == StatusType.PUBLISHED
+                && (newStatus == StatusType.ARCHIVED || newStatus == StatusType.DISCARDED));
+        EPOSDataModelEntity entityToSave = statusOnlyTransition || obj.getUid() == null ? existingEntity : obj;
 
         entityToSave.setStatus(newStatus);
         entityToSave.setFileProvenance("backoffice");
@@ -309,6 +327,14 @@ public class EPOSDataModelManager {
 
             entityToSave.setEditorId(user.getAuthIdentifier());
 
+            String userDraftInstanceId = findDraftForUserAndMeta(
+                    existingEntity.getMetaId(), user.getAuthIdentifier());
+            if (userDraftInstanceId != null
+                    && !userDraftInstanceId.equals(obj.getInstanceId())) {
+                return new ApiResponseMessage(ApiResponseMessage.OK,
+                        dbapi.retrieveLinkedEntity(userDraftInstanceId));
+            }
+
             // If same user, modify existing DRAFT
             if (user.getIsAdmin() || user.getAuthIdentifier().equals(existingEntity.getEditorId())) {
                 LinkedEntity reference = dbapi.create(entityToSave, null, null, null);
@@ -316,7 +342,7 @@ public class EPOSDataModelManager {
             }
             // Different user trying to modify someone else's DRAFT -> Create NEW DRAFT
             // This allows multiple users to have their own DRAFTs of the same entity
-            if (hasDraftForUserAndMeta(dbapi, existingEntity.getMetaId(), user.getAuthIdentifier(), null)) {
+            if (userDraftInstanceId != null) {
                 log.warn("Entity update rejected: duplicate draft userId={} entityType={} metaId={} instanceId={}",
                         userId, entityNames.name(), existingEntity.getMetaId(), existingEntity.getInstanceId());
                 return new ApiResponseMessage(ApiResponseMessage.ERROR,
@@ -356,7 +382,7 @@ public class EPOSDataModelManager {
 
         // PUBLISHED -> any other modification: Create new DRAFT version
         if (currentStatus == StatusType.PUBLISHED && newStatus != StatusType.ARCHIVED && newStatus != StatusType.DISCARDED) {
-            if (hasDraftForUserAndMeta(dbapi, existingEntity.getMetaId(), user.getAuthIdentifier(), null)) {
+            if (findDraftForUserAndMeta(existingEntity.getMetaId(), user.getAuthIdentifier()) != null) {
                 log.warn("Entity update rejected: duplicate draft userId={} entityType={} metaId={} instanceId={}",
                         userId, entityNames.name(), existingEntity.getMetaId(), existingEntity.getInstanceId());
                 return new ApiResponseMessage(ApiResponseMessage.ERROR,
@@ -430,27 +456,23 @@ public class EPOSDataModelManager {
         }
     }
 
-    private static boolean hasDraftForUserAndMeta(AbstractAPI dbapi, String metaId, String editorId, String excludeInstanceId) {
+    private static String findDraftForUserAndMeta(String metaId, String editorId) {
         if (metaId == null || editorId == null) {
-            return false;
+            return null;
         }
 
-        List<Object> allDrafts = dbapi.retrieveAllWithStatus(StatusType.DRAFT);
-        for (Object item : allDrafts) {
-            EPOSDataModelEntity draft = (EPOSDataModelEntity) item;
-            if (!metaId.equals(draft.getMetaId())) {
-                continue;
+        List<Versioningstatus> drafts = getDbaccess().getOneFromDBBySpecificKeySimpleNoCache(
+                "status", StatusType.DRAFT.name(), Versioningstatus.class);
+        for (Versioningstatus draft : drafts) {
+            if (metaId.equals(draft.getMetaId())
+                    && editorId.trim().equalsIgnoreCase(
+                    draft.getEditorId() != null ? draft.getEditorId().trim() : "")
+                    && draft.getInstanceId() != null) {
+                return draft.getInstanceId();
             }
-            if (!editorId.equals(draft.getEditorId())) {
-                continue;
-            }
-            if (excludeInstanceId != null && excludeInstanceId.equals(draft.getInstanceId())) {
-                continue;
-            }
-            return true;
         }
 
-        return false;
+        return null;
     }
 
     // ==================== PERMISSION HELPER METHODS ====================

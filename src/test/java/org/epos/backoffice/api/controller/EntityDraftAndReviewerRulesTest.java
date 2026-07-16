@@ -10,9 +10,11 @@ import org.epos.backoffice.api.util.EPOSDataModelManager;
 import org.epos.backoffice.api.util.GroupManager;
 import org.epos.backoffice.api.util.UserManager;
 import org.epos.eposdatamodel.Address;
+import org.epos.eposdatamodel.Distribution;
 import org.epos.eposdatamodel.Group;
 import org.epos.eposdatamodel.LinkedEntity;
 import org.epos.eposdatamodel.User;
+import org.epos.eposdatamodel.WebService;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 
@@ -127,6 +129,103 @@ public class EntityDraftAndReviewerRulesTest extends TestcontainersLifecycle {
                 duplicateResponse.getEntity().getInstanceId()
         );
 
+    }
+
+    @Test
+    @Order(4)
+    public void partialSubmitWithUidPreservesThePersistedDraft() {
+        Address draft = buildAddress(testGroup.getId());
+        ApiResponseMessage createResponse = EPOSDataModelManager.createEposDataModelEntity(
+                draft, editorUser, EntityNames.ADDRESS, Address.class);
+        LinkedEntity created = createResponse.getEntity();
+
+        Address submitRequest = new Address();
+        submitRequest.setInstanceId(created.getInstanceId());
+        submitRequest.setMetaId(created.getMetaId());
+        submitRequest.setUid(created.getUid());
+        submitRequest.setStatus(StatusType.SUBMITTED);
+
+        ApiResponseMessage submitResponse = EPOSDataModelManager.updateEposDataModelEntity(
+                submitRequest, editorUser, EntityNames.ADDRESS, Address.class);
+        assertEquals(ApiResponseMessage.OK, submitResponse.getCode());
+
+        Address submitted = (Address) EPOSDataModelManager.getEPOSDataModelEposDataModelEntity(
+                created.getMetaId(), created.getInstanceId(), editorUser, EntityNames.ADDRESS, Address.class)
+                .getListOfEntities().get(0);
+        assertEquals(StatusType.SUBMITTED, submitted.getStatus());
+        assertEquals("Italy", submitted.getCountry());
+        assertEquals("IT", submitted.getCountryCode());
+        assertEquals("Via Roma", submitted.getStreet());
+        assertEquals("00100", submitted.getPostalCode());
+        assertEquals("Rome", submitted.getLocality());
+    }
+
+    @Test
+    @Order(5)
+    public void partialSubmitPreservesDistributionDraftFields() {
+        Distribution draft = new Distribution();
+        draft.setUid(UUID.randomUUID().toString());
+        draft.setTitle(List.of("Draft distribution title"));
+        draft.setDescription(List.of("Draft distribution description"));
+        draft.setFormat("application/json");
+        draft.setLicence("https://example.org/license");
+        draft.setAccessURL(List.of("https://example.org/draft-access"));
+        draft.setGroups(List.of(testGroup.getId()));
+        draft.setStatus(StatusType.DRAFT);
+
+        LinkedEntity created = EPOSDataModelManager.createEposDataModelEntity(
+                draft, editorUser, EntityNames.DISTRIBUTION, Distribution.class).getEntity();
+        Distribution submitRequest = new Distribution();
+        submitRequest.setInstanceId(created.getInstanceId());
+        submitRequest.setMetaId(created.getMetaId());
+        submitRequest.setUid(created.getUid());
+        submitRequest.setStatus(StatusType.SUBMITTED);
+
+        assertEquals(ApiResponseMessage.OK, EPOSDataModelManager.updateEposDataModelEntity(
+                submitRequest, editorUser, EntityNames.DISTRIBUTION, Distribution.class).getCode());
+
+        Distribution submitted = (Distribution) EPOSDataModelManager.getEPOSDataModelEposDataModelEntity(
+                created.getMetaId(), created.getInstanceId(), editorUser, EntityNames.DISTRIBUTION, Distribution.class)
+                .getListOfEntities().get(0);
+        assertEquals(StatusType.SUBMITTED, submitted.getStatus());
+        assertEquals("Draft distribution title", submitted.getTitle().get(0));
+        assertEquals("Draft distribution description", submitted.getDescription().get(0));
+        assertEquals("application/json", submitted.getFormat());
+        assertEquals("https://example.org/license", submitted.getLicence());
+        assertEquals("https://example.org/draft-access", submitted.getAccessURL().get(0));
+    }
+
+    @Test
+    @Order(6)
+    public void partialSubmitPreservesWebServiceDraftFields() {
+        WebService draft = new WebService();
+        draft.setUid(UUID.randomUUID().toString());
+        draft.setName("Draft web service name");
+        draft.setDescription("Draft web service description");
+        draft.setEntryPoint("https://example.org/draft-service");
+        draft.setLicense("https://example.org/license");
+        draft.setGroups(List.of(testGroup.getId()));
+        draft.setStatus(StatusType.DRAFT);
+
+        LinkedEntity created = EPOSDataModelManager.createEposDataModelEntity(
+                draft, editorUser, EntityNames.WEBSERVICE, WebService.class).getEntity();
+        WebService submitRequest = new WebService();
+        submitRequest.setInstanceId(created.getInstanceId());
+        submitRequest.setMetaId(created.getMetaId());
+        submitRequest.setUid(created.getUid());
+        submitRequest.setStatus(StatusType.SUBMITTED);
+
+        assertEquals(ApiResponseMessage.OK, EPOSDataModelManager.updateEposDataModelEntity(
+                submitRequest, editorUser, EntityNames.WEBSERVICE, WebService.class).getCode());
+
+        WebService submitted = (WebService) EPOSDataModelManager.getEPOSDataModelEposDataModelEntity(
+                created.getMetaId(), created.getInstanceId(), editorUser, EntityNames.WEBSERVICE, WebService.class)
+                .getListOfEntities().get(0);
+        assertEquals(StatusType.SUBMITTED, submitted.getStatus());
+        assertEquals("Draft web service name", submitted.getName());
+        assertEquals("Draft web service description", submitted.getDescription());
+        assertEquals("https://example.org/draft-service", submitted.getEntryPoint());
+        assertEquals("https://example.org/license", submitted.getLicense());
     }
 
     private static Address buildAddress(String groupId) {
