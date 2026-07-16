@@ -44,7 +44,7 @@ public class EmailWrapper {
             restTemplate.postForEntity(url, entity, Void.class);
             log.debug("Review request sent successfully");
         } catch (Exception e) {
-            log.error("Error calling email-sender-service", e);
+            log.warn("Could not send review request because email-sender-service is unavailable");
         }
     }
 
@@ -308,7 +308,8 @@ public class EmailWrapper {
             restTemplate.postForEntity(url, entity, Void.class);
             log.debug("Direct email sent successfully to {} recipients", emails.size());
         } catch (Exception e) {
-            log.error("Error calling email-sender-service", e);
+            log.warn("Could not send email because email-sender-service is unavailable");
+            log.debug("Error calling email-sender-service", e);
         }
     }
 

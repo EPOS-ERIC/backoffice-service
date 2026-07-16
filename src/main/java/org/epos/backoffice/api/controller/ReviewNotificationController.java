@@ -100,8 +100,8 @@ public class ReviewNotificationController extends MetadataAbstractController<Dat
             log.info("Review request sent metaId={} instanceId={} userId={}", meta_id, instance_id, user.getAuthIdentifier());
             return ResponseEntity.ok("Review request sent successfully");
         } catch (Exception e) {
-            log.error("Error calling email-sender-service metaId={} instanceId={} userId={}",
-                    meta_id, instance_id, user.getAuthIdentifier(), e);
+            log.warn("Could not send review request because email-sender-service is unavailable metaId={} instanceId={} userId={}",
+                    meta_id, instance_id, user.getAuthIdentifier());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error sending review request");
         }
     }

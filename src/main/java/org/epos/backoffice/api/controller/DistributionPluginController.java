@@ -167,8 +167,8 @@ public class DistributionPluginController extends MetadataAbstractController<Dis
             log.info("Plugin email sent metaId={} instanceId={} userId={}", meta_id, instance_id, user.getAuthIdentifier());
             return ResponseEntity.ok("{ \"response\": \"Email sent successfully\"}");
         } catch (Exception e) {
-            log.error("Error calling email-sender-service metaId={} instanceId={} userId={}",
-                    meta_id, instance_id, user.getAuthIdentifier(), e);
+            log.warn("Could not send plugin email because email-sender-service is unavailable metaId={} instanceId={} userId={}",
+                    meta_id, instance_id, user.getAuthIdentifier());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("{ \"response\": \"error sending email: " + e.getMessage() + "\"}");
         }
