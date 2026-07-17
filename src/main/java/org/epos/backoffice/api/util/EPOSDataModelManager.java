@@ -292,6 +292,15 @@ public class EPOSDataModelManager {
                 && (newStatus == StatusType.ARCHIVED || newStatus == StatusType.DISCARDED));
         EPOSDataModelEntity entityToSave = statusOnlyTransition || obj.getUid() == null ? existingEntity : obj;
 
+        // Lifecycle requests are often sparse, but a DataProduct submit can
+        // explicitly carry the edited draft Distribution link. Keep that link
+        // instead of reusing a stale published sibling from the persisted DTO.
+        if (statusOnlyTransition && obj instanceof DataProduct requestedDataProduct
+                && requestedDataProduct.getDistribution() != null
+                && entityToSave instanceof DataProduct persistedDataProduct) {
+            persistedDataProduct.setDistribution(requestedDataProduct.getDistribution());
+        }
+
         entityToSave.setStatus(newStatus);
         entityToSave.setFileProvenance("backoffice");
 

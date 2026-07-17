@@ -1,0 +1,52 @@
+[
+  {
+    "accessRight": "https://publications.europa.eu/resource/authority/access-right/PUBLIC",
+    "accrualPeriodicity": "http://purl.org/cld/freq/continuous",
+    "category": [{"entityType":"CATEGORY","instanceId":"0fe982f9-16fa-46e3-8b6f-dab62d1cca08","metaId":"4054be0c-79e4-4785-a571-acd236b8c071","uid":"category:wavefmdata"}],
+    "changeComment": "",
+    "changeTimestamp": "2026-07-17T09:32:01.29494",
+    "contactPoint": [
+      {"entityType":"CONTACTPOINT","instanceId":"5ccf19bb-6bfa-406e-90ee-5572235fd9f0","metaId":"50b30b65-0f07-4cca-8880-557aaa506548","uid":"https://orcid.org/0000-0001-7080-183X/scientificContact"},
+      {"entityType":"CONTACTPOINT","instanceId":"dc85da37-ae24-4841-8ac4-65e6c08b1481","metaId":"9711ba9b-98c6-4182-996d-4f3111d1a990","uid":"https://orcid.org/0000-0003-4612-7421/technicalContact"}
+    ],
+    "created": "2009-01-01T00:00:00",
+    "description": ["Seismic Waveform Continuous Dataset."],
+    "distribution": [{"entityType":"DISTRIBUTION","instanceId":"e4926fd4-1421-443f-a277-45286586130f","metaId":"6f2d731f-9fdb-421a-adcc-1d23e8572cc9","uid":"https://www.epos-eu.org/epos-dcat-ap/NearFaultObservatory/KOERI/WAVEFORM_CONTINUOUS/Distribution/001"}],
+    "documentation": "",
+    "editorId": "4d2b983a88a14e098e06bcdf9254123a@aaai.epos-eu.org",
+    "fileProvenance": "backoffice",
+    "groups": ["ceb9fcc4-4687-4ac4-91ef-be03643b2541"],
+    "hasPart": null,
+    "identifier": [
+      {"entityType":"IDENTIFIER","instanceId":"5dfcb6b5-98ba-4f8b-a897-1481fc67183b","metaId":"1ecc68bc-ef8e-446f-83ee-c43b607ab714","uid":"_:8fe4fb3718afeecd5b0bf5a3e2f00ed6"},
+      {"entityType":"IDENTIFIER","instanceId":"68135c9e-6b80-45b4-ae28-7f76fe79a21e","metaId":"a090334d-557d-40b9-b9f1-8b46555c80a4","uid":"_:2bbdf87507026741cf18e338033c0961"}
+    ],
+    "instanceChangedId": "58a64ca2-57cc-424c-a22c-1bef50d70cd2",
+    "instanceId": "0f94970e-a87d-47fe-8d67-27b241a06d16",
+    "isPartOf": null,
+    "issued": "2009-01-01T00:00:00",
+    "keywords": "seismicity,\tAcceleration,\tearth structure,\tearthquake,\tMarmara Near Fault Observatory,\twaveform modeling,\tNear Fault Observatories,\tKOERI,\tseismology,\tseismic waveform,\tEIDA,\tVelocity,\tNFO,\twaveform,\tMarmara,\tseismic hazard",
+    "landingPage": null,
+    "metaId": "3144b49b-baf1-486e-9a6c-9de86d4c5905",
+    "modified": "2009-01-01T00:00:00",
+    "operation": null,
+    "provenance": null,
+    "publisher": [{"entityType":"ORGANIZATION","instanceId":"5dd85309-2453-47ef-ab7d-33770cf69e5e","metaId":"1fb44d7f-1ae4-4e28-bb2a-a313184cee67","uid":"PIC:999882500"}],
+    "qualifiedAttribution": null,
+    "qualityAssurance": "https://fridge.ingv.it/docs/API_prototype_documentation_NFO_QA.pdf",
+    "referencedBy": null,
+    "relation": null,
+    "source": null,
+    "spatialExtent": [{"entityType":"LOCATION","instanceId":"5757c4a9-8768-4b99-9434-e0e3cbb1d0bc","metaId":"26210354-4a2d-448b-90a4-8e2894bf6a4b","uid":"_:13b0244fd99eee268f4f9c54642c39bd"}],
+    "status": "DRAFT",
+    "temporalExtent": [{"entityType":"PERIODOFTIME","instanceId":"08af0b8e-9562-49eb-b52a-bfd58f473557","metaId":"64252f10-c5d4-404a-b3bd-d0860d28db15","uid":"_:2ffbcb7c7d3291b669cb8d00c1ccd579"}],
+    "title": ["Marmara Seismic Velocity and Acceleration Waveform Dataset"],
+    "toBeDelete": null,
+    "type": "http://purl.org/dc/dcmitype/Collection",
+    "uid": "https://www.epos-eu.org/epos-dcat-ap/NearFaultObservatory/KOERI/WAVEFORM_CONTINUOUS/Dataset/001",
+    "variableMeasured": null,
+    "version": "",
+    "versionId": "6dd077ee-023e-449c-90c3-9f3d1fc0762f",
+    "versionInfo": "1.0.0"
+  }
+]
