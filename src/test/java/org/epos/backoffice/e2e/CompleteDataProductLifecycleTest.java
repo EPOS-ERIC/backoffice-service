@@ -15,31 +15,18 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import java.time.Duration;
-
-import org.epos.backoffice.Swagger2SpringBoot;
 import org.epos.backoffice.api.util.AddUserToGroupBean;
 import org.epos.backoffice.api.util.ApiResponseMessage;
 import org.epos.backoffice.api.util.UserManager;
 import org.epos.eposdatamodel.Group;
 import org.epos.eposdatamodel.User;
-import org.epos.handler.dbapi.service.EntityManagerService;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import org.testcontainers.postgresql.PostgreSQLContainer;
-import org.testcontainers.utility.DockerImageName;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
@@ -47,52 +34,9 @@ import model.RequestStatusType;
 import model.RoleType;
 import usermanagementapis.UserGroupManagementAPI;
 
-@SpringBootTest(classes = Swagger2SpringBoot.class)
-@AutoConfigureMockMvc
-class CompleteDataProductLifecycleTest {
+class CompleteDataProductLifecycleTest extends E2eTestInfrastructure {
 
 	private static final Logger LOG = LoggerFactory.getLogger(CompleteDataProductLifecycleTest.class);
-
-	private static final PostgreSQLContainer METADATA_CATALOGUE = new PostgreSQLContainer(
-			DockerImageName.parse("ghcr.io/epos-eric/metadata-database/deploy:main")
-					.asCompatibleSubstituteFor("postgres"))
-			.withDatabaseName("cerif")
-			.withUsername("postgres")
-			.withPassword("changeme")
-			.withExposedPorts(5432)
-			.withStartupTimeout(Duration.ofMinutes(1))
-			.withEnv("POSTGRES_HOST_AUTH_METHOD", "md5")
-			.withCommand("postgres", "-c", "password_encryption=md5");
-
-	private static EntityManagerService dbService;
-
-	@Autowired
-	private MockMvc mockMvc;
-
-	@Autowired
-	private ObjectMapper objectMapper;
-
-	@BeforeAll
-	static void startMetadataDatabase() {
-		LOG.info("=== Infrastructure: start metadata PostgreSQL container ===");
-		METADATA_CATALOGUE.start();
-		dbService = new EntityManagerService.EntityManagerServiceBuilder()
-				.setConnectionString(METADATA_CATALOGUE.getJdbcUrl())
-				.setPostgresqlUsername(METADATA_CATALOGUE.getUsername())
-				.setPostgresqlPassword(METADATA_CATALOGUE.getPassword())
-				.build();
-		LOG.info("Infrastructure ready: metadata database connected");
-	}
-
-	@AfterAll
-	static void stopMetadataDatabase() {
-		LOG.info("=== Infrastructure: stop metadata services ===");
-		if (dbService != null) {
-			dbService.close();
-		}
-		METADATA_CATALOGUE.close();
-		LOG.info("Infrastructure stopped: metadata database disconnected and container closed");
-	}
 
 	@Test
 	void setupAdminAndEditorForCompleteDataProductScenario() throws Exception {
