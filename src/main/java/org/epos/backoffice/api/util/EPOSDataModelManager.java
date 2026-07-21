@@ -329,6 +329,7 @@ public class EPOSDataModelManager {
 						|| entityNames.equals(EntityNames.CATEGORY)
 						|| entityNames.equals(EntityNames.ORGANIZATION)
 						|| entityNames.equals(EntityNames.PERSON)
+						|| entityNames.equals(EntityNames.IDENTIFIER)
 						|| entityNames.equals(EntityNames.ADDRESS))) {
 			LinkedEntity reference = dbapi.create(entityToSave, null, null, null);
 			return new ApiResponseMessage(ApiResponseMessage.OK, reference);
