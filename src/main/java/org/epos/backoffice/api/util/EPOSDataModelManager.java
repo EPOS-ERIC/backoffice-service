@@ -325,6 +325,7 @@ public class EPOSDataModelManager {
         }
 
 		if (currentStatus == StatusType.PUBLISHED && newStatus == StatusType.PUBLISHED
+				&& user.getIsAdmin() // only admins should be able to create things as published
 				&& (entityNames.equals(EntityNames.CATEGORYSCHEME)
 						|| entityNames.equals(EntityNames.CATEGORY)
 						|| entityNames.equals(EntityNames.ORGANIZATION)
