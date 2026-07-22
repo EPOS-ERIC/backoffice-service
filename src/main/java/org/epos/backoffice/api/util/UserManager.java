@@ -28,6 +28,12 @@ public class UserManager {
 		}
 
 		log.debug("User read request requester={} instanceId={} availableSection={}", requesterId, instance_id, available_section);
+		boolean requesterIsAdmin = isExistingAdmin(user);
+		boolean requestingSelf = "self".equals(instance_id) || instance_id.equals(requesterId);
+		if (("all".equals(instance_id) || !requestingSelf) && !requesterIsAdmin) {
+			log.warn("User read denied requester={} targetUserId={} admin={}", requesterId, instance_id, requesterIsAdmin);
+			return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "You can't retrieve other users");
+		}
 
 		List<User> personList;
 		if(instance_id.equals("self")){

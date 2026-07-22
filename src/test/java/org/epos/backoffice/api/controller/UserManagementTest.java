@@ -97,4 +97,33 @@ public class UserManagementTest extends TestcontainersLifecycle {
         assertTrue(Boolean.TRUE.equals(createdUser.getIsAdmin()));
     }
 
+    @Test
+    @Order(6)
+    public void testNonAdminCannotRetrieveAllUsers() {
+        String suffix = UUID.randomUUID().toString();
+        User nonAdmin = new User("security-reader-" + suffix, "Reader", "Security",
+                "security-reader@email.email", false);
+        UserGroupManagementAPI.createUser(nonAdmin);
+
+        ApiResponseMessage response = UserManager.getUser("all", nonAdmin, false);
+
+        assertEquals(ApiResponseMessage.UNAUTHORIZED, response.getCode());
+    }
+
+    @Test
+    @Order(7)
+    public void testNonAdminCannotRetrieveAnotherUser() {
+        String suffix = UUID.randomUUID().toString();
+        User nonAdmin = new User("security-reader-" + suffix, "Reader", "Security",
+                "security-reader@email.email", false);
+        User target = new User("security-target-" + suffix, "Target", "Security",
+                "security-target@email.email", false);
+        UserGroupManagementAPI.createUser(nonAdmin);
+        UserGroupManagementAPI.createUser(target);
+
+        ApiResponseMessage response = UserManager.getUser(target.getAuthIdentifier(), nonAdmin, false);
+
+        assertEquals(ApiResponseMessage.UNAUTHORIZED, response.getCode());
+    }
+
 }
