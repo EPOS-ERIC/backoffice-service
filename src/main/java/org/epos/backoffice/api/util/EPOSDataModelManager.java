@@ -913,7 +913,14 @@ public class EPOSDataModelManager {
             return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "The user can't delete this entity");
         }
         
-        dbapi.delete(instance_id);
+        if (!Boolean.TRUE.equals(dbapi.delete(instance_id))) {
+            log.error("Entity delete failed userId={} entityType={} metaId={} instanceId={}",
+                    userId,
+                    entityNames.name(),
+                    existingEntity.getMetaId(),
+                    instance_id);
+            return new ApiResponseMessage(ApiResponseMessage.INTERNAL_ERROR, "Entity could not be deleted");
+        }
         log.info("Entity deleted userId={} entityType={} metaId={} instanceId={}",
                 userId,
                 entityNames.name(),

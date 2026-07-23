@@ -88,6 +88,8 @@ public abstract class MetadataAbstractController<T extends EPOSDataModelEntity> 
 				return ResponseEntity.status(200).body(response);
 			} else if(response.getCode() == ApiResponseMessage.UNAUTHORIZED) {
 				return ResponseEntity.status(403).body(response);
+			} else if(response.getCode() == ApiResponseMessage.INTERNAL_ERROR) {
+				return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
 			} else {
 				return ResponseEntity.status(400).body(response);
 			}

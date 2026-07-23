@@ -16,6 +16,7 @@ public class ApiResponseMessage {
     public static final int OK = 4;
     public static final int TOO_BUSY = 5;
     public static final int UNAUTHORIZED = 6;
+    public static final int INTERNAL_ERROR = 7;
 
     int code;
     String type;
@@ -50,6 +51,9 @@ public class ApiResponseMessage {
             case UNAUTHORIZED:
                 setType("unauthorized");
                 break;
+            case INTERNAL_ERROR:
+                setType("error");
+                break;
             default:
                 setType("unknown");
                 break;
@@ -77,6 +81,9 @@ public class ApiResponseMessage {
                 break;
             case UNAUTHORIZED:
                 setType("unauthorized");
+                break;
+            case INTERNAL_ERROR:
+                setType("error");
                 break;
             default:
                 setType("unknown");
@@ -106,6 +113,9 @@ public class ApiResponseMessage {
 	            case UNAUTHORIZED:
 	                setType("unauthorized");
 	                break;
+	            case INTERNAL_ERROR:
+	                setType("error");
+	                break;
 	            default:
 	                setType("unknown");
 	                break;
@@ -134,6 +144,9 @@ public class ApiResponseMessage {
 	            case UNAUTHORIZED:
 	                setType("unauthorized");
 	                break;
+	            case INTERNAL_ERROR:
+	                setType("error");
+	                break;
 	            default:
 	                setType("unknown");
 	                break;
@@ -161,6 +174,9 @@ public class ApiResponseMessage {
                 break;
             case UNAUTHORIZED:
                 setType("unauthorized");
+                break;
+            case INTERNAL_ERROR:
+                setType("error");
                 break;
             default:
                 setType("unknown");
