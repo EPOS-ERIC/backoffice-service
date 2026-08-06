@@ -129,12 +129,12 @@ public class EPOSDataModelManager {
 
     public static ApiResponseMessage createEposDataModelEntity(EPOSDataModelEntity obj, User user, EntityNames entityNames, Class clazz) {
         String userId = user != null ? user.getAuthIdentifier() : null;
-        if (hasUnauthorizedEditorId(obj, user)) {
+        /*if (hasUnauthorizedEditorId(obj, user)) {
             log.warn("Entity create rejected: editorId does not match session userId={} requestedEditorId={} entityType={}",
                     userId, obj.getEditorId(), entityNames.name());
             return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED,
                     "{\"response\" : \"Only an admin can set a different editorId\"}");
-        }
+        }*/
         String editorId = getEffectiveEditorId(obj, user);
 
         EposDataModelDAO.getInstance().clearAllCaches();
