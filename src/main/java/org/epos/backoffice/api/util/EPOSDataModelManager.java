@@ -513,7 +513,7 @@ public class EPOSDataModelManager {
 
     private static String getEffectiveEditorId(EPOSDataModelEntity obj, User user) {
         String requestedEditorId = obj.getEditorId();
-        if (requestedEditorId != null && !requestedEditorId.equals(user.getAuthIdentifier())) {
+        if (requestedEditorId != null && !requestedEditorId.equals("ingestor") && !requestedEditorId.equals(user.getAuthIdentifier())) {
             return requestedEditorId;
         }
         return user.getAuthIdentifier();
