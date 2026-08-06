@@ -128,6 +128,14 @@ public class EPOSDataModelManager {
     }
 
     public static ApiResponseMessage createEposDataModelEntity(EPOSDataModelEntity obj, User user, EntityNames entityNames, Class clazz) {
+        String userId = user != null ? user.getAuthIdentifier() : null;
+        if (hasUnauthorizedEditorId(obj, user)) {
+            log.warn("Entity create rejected: editorId does not match session userId={} requestedEditorId={} entityType={}",
+                    userId, obj.getEditorId(), entityNames.name());
+            return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED,
+                    "{\"response\" : \"Only an admin can set a different editorId\"}");
+        }
+        String editorId = getEffectiveEditorId(obj, user);
 
         EposDataModelDAO.getInstance().clearAllCaches();
 
@@ -135,7 +143,6 @@ public class EPOSDataModelManager {
         
         // Pre-fetch user's group roles once for all permission checks (optimization)
         final Map<String, String> userGroupRoles = user.getIsAdmin() ? null : getUserAcceptedGroupRoles(user);
-        String userId = user != null ? user.getAuthIdentifier() : null;
 
         // If creating from an existing entity (e.g., draft from published), retrieve it first
         EPOSDataModelEntity existingEntity = null;
@@ -157,7 +164,7 @@ public class EPOSDataModelManager {
                 // Set the target status for the new entity (default DRAFT)
                 obj.setStatus(obj.getStatus() == null ? StatusType.DRAFT : obj.getStatus());
                 if (obj.getStatus() == StatusType.DRAFT
-                        && findDraftForUserAndMeta(existingEntity.getMetaId(), user.getAuthIdentifier()) != null) {
+                        && findDraftForUserAndMeta(existingEntity.getMetaId(), editorId) != null) {
                     log.warn("Entity create rejected: duplicate draft userId={} entityType={} metaId={} sourceInstanceId={}",
                             userId, entityNames.name(), existingEntity.getMetaId(), existingEntity.getInstanceId());
                     return new ApiResponseMessage(ApiResponseMessage.ERROR,
@@ -222,7 +229,7 @@ public class EPOSDataModelManager {
                     obj.getStatus());
         }
 
-        obj.setEditorId(user.getAuthIdentifier());
+        obj.setEditorId(editorId);
         obj.setFileProvenance("backoffice");
 
         LinkedEntity reference = dbapi.create(obj, null, null, null);
@@ -243,9 +250,17 @@ public class EPOSDataModelManager {
     }
 
     public static ApiResponseMessage updateEposDataModelEntity(EPOSDataModelEntity obj, User user, EntityNames entityNames, Class clazz) {
+        String userId = user != null ? user.getAuthIdentifier() : null;
+        if (hasUnauthorizedEditorId(obj, user)) {
+            log.warn("Entity update rejected: editorId does not match session userId={} requestedEditorId={} entityType={} instanceId={}",
+                    userId, obj.getEditorId(), entityNames.name(), obj.getInstanceId());
+            return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED,
+                    "{\"response\" : \"Only an admin can set a different editorId\"}");
+        }
+        String editorId = getEffectiveEditorId(obj, user);
+
         EposDataModelDAO.getInstance().clearAllCaches();
         AbstractAPI dbapi = AbstractAPI.retrieveAPI(entityNames.name());
-        String userId = user != null ? user.getAuthIdentifier() : null;
 
         if (obj.getInstanceId() == null) {
             log.warn("Entity update rejected: missing instanceId userId={} entityType={} metaId={}",
@@ -339,10 +354,10 @@ public class EPOSDataModelManager {
         // DRAFT -> DRAFT: Check if same user or create new DRAFT
         if (currentStatus == StatusType.DRAFT && newStatus == StatusType.DRAFT) {
 
-            entityToSave.setEditorId(user.getAuthIdentifier());
+            entityToSave.setEditorId(editorId);
 
             String userDraftInstanceId = findDraftForUserAndMeta(
-                    existingEntity.getMetaId(), user.getAuthIdentifier());
+                    existingEntity.getMetaId(), editorId);
             if (userDraftInstanceId != null
                     && !userDraftInstanceId.equals(obj.getInstanceId())) {
                 return new ApiResponseMessage(ApiResponseMessage.OK,
@@ -396,7 +411,7 @@ public class EPOSDataModelManager {
 
         // PUBLISHED -> any other modification: Create new DRAFT version
         if (currentStatus == StatusType.PUBLISHED && newStatus != StatusType.ARCHIVED && newStatus != StatusType.DISCARDED) {
-            if (findDraftForUserAndMeta(existingEntity.getMetaId(), user.getAuthIdentifier()) != null) {
+            if (findDraftForUserAndMeta(existingEntity.getMetaId(), editorId) != null) {
                 log.warn("Entity update rejected: duplicate draft userId={} entityType={} metaId={} instanceId={}",
                         userId, entityNames.name(), existingEntity.getMetaId(), existingEntity.getInstanceId());
                 return new ApiResponseMessage(ApiResponseMessage.ERROR,
@@ -406,7 +421,7 @@ public class EPOSDataModelManager {
             entityToSave.setMetaId(existingEntity.getMetaId());
             entityToSave.setStatus(StatusType.DRAFT);
             entityToSave.setInstanceChangedId(existingEntity.getInstanceId());
-            entityToSave.setEditorId(user.getAuthIdentifier());
+            entityToSave.setEditorId(editorId);
 
             LinkedEntity reference = dbapi.create(entityToSave, null, null, null);
 
@@ -487,6 +502,21 @@ public class EPOSDataModelManager {
         }
 
         return null;
+    }
+
+    private static boolean hasUnauthorizedEditorId(EPOSDataModelEntity obj, User user) {
+        String requestedEditorId = obj.getEditorId();
+        return requestedEditorId != null
+                && !requestedEditorId.equals(user.getAuthIdentifier())
+                && !Boolean.TRUE.equals(user.getIsAdmin());
+    }
+
+    private static String getEffectiveEditorId(EPOSDataModelEntity obj, User user) {
+        String requestedEditorId = obj.getEditorId();
+        if (requestedEditorId != null && !requestedEditorId.equals(user.getAuthIdentifier())) {
+            return requestedEditorId;
+        }
+        return user.getAuthIdentifier();
     }
 
     // ==================== PERMISSION HELPER METHODS ====================
