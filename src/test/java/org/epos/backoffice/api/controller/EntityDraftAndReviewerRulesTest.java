@@ -9,7 +9,6 @@ import org.epos.backoffice.api.util.ApiResponseMessage;
 import org.epos.backoffice.api.util.EPOSDataModelManager;
 import org.epos.backoffice.api.util.GroupManager;
 import org.epos.backoffice.api.util.UserManager;
-import org.epos.eposdatamodel.Address;
 import org.epos.eposdatamodel.Distribution;
 import org.epos.eposdatamodel.Group;
 import org.epos.eposdatamodel.LinkedEntity;
@@ -62,34 +61,35 @@ public class EntityDraftAndReviewerRulesTest extends TestcontainersLifecycle {
     @Test
     @Order(2)
     public void reviewerCanPublishSubmittedEntityOfAnotherUserInSameGroup() {
-        Address address = buildAddress(testGroup.getId());
+        Distribution address = buildDistribution(testGroup.getId());
         ApiResponseMessage createResponse = EPOSDataModelManager.createEposDataModelEntity(
-                address, editorUser, EntityNames.ADDRESS, Address.class);
+                address, editorUser, EntityNames.DISTRIBUTION, Distribution.class);
 
         assertEquals(ApiResponseMessage.OK, createResponse.getCode());
         LinkedEntity created = createResponse.getEntity();
         assertNotNull(created);
 
-        Address editorDraft = (Address) EPOSDataModelManager.getEPOSDataModelEposDataModelEntity(
-                created.getMetaId(), created.getInstanceId(), editorUser, EntityNames.ADDRESS, Address.class)
+        Distribution editorDraft = (Distribution) EPOSDataModelManager.getEPOSDataModelEposDataModelEntity(
+                created.getMetaId(), created.getInstanceId(), editorUser, EntityNames.DISTRIBUTION, Distribution.class)
                 .getListOfEntities().get(0);
 
         editorDraft.setStatus(StatusType.SUBMITTED);
         ApiResponseMessage submitResponse = EPOSDataModelManager.updateEposDataModelEntity(
-                editorDraft, editorUser, EntityNames.ADDRESS, Address.class);
+                editorDraft, editorUser, EntityNames.DISTRIBUTION, Distribution.class);
         assertEquals(ApiResponseMessage.OK, submitResponse.getCode());
 
-        Address reviewerView = (Address) EPOSDataModelManager.getEPOSDataModelEposDataModelEntity(
-                created.getMetaId(), created.getInstanceId(), reviewerUser, EntityNames.ADDRESS, Address.class)
+        Distribution reviewerView = (Distribution) EPOSDataModelManager.getEPOSDataModelEposDataModelEntity(
+                created.getMetaId(), created.getInstanceId(), reviewerUser, EntityNames.DISTRIBUTION, Distribution.class)
                 .getListOfEntities().get(0);
 
         reviewerView.setStatus(StatusType.PUBLISHED);
+        reviewerView.setEditorId(reviewerUser.getAuthIdentifier());
         ApiResponseMessage publishResponse = EPOSDataModelManager.updateEposDataModelEntity(
-                reviewerView, reviewerUser, EntityNames.ADDRESS, Address.class);
+                reviewerView, reviewerUser, EntityNames.DISTRIBUTION, Distribution.class);
         assertEquals(ApiResponseMessage.OK, publishResponse.getCode());
 
-        Address published = (Address) EPOSDataModelManager.getEPOSDataModelEposDataModelEntity(
-                created.getMetaId(), created.getInstanceId(), adminUser, EntityNames.ADDRESS, Address.class)
+        Distribution published = (Distribution) EPOSDataModelManager.getEPOSDataModelEposDataModelEntity(
+                created.getMetaId(), created.getInstanceId(), adminUser, EntityNames.DISTRIBUTION, Distribution.class)
                 .getListOfEntities().get(0);
         assertEquals(StatusType.PUBLISHED, published.getStatus());
     }
@@ -97,30 +97,30 @@ public class EntityDraftAndReviewerRulesTest extends TestcontainersLifecycle {
     @Test
     @Order(3)
     public void userCanHaveOnlyOneDraftPerEntityButAnotherUserCanHaveOwnDraft() {
-        Address baseDraft = buildAddress(testGroup.getId());
+        Distribution baseDraft = buildDistribution(testGroup.getId());
         ApiResponseMessage baseCreateResponse = EPOSDataModelManager.createEposDataModelEntity(
-                baseDraft, editorUser, EntityNames.ADDRESS, Address.class);
+                baseDraft, editorUser, EntityNames.DISTRIBUTION, Distribution.class);
 
         assertEquals(ApiResponseMessage.OK, baseCreateResponse.getCode());
         LinkedEntity baseLinked = baseCreateResponse.getEntity();
         assertNotNull(baseLinked);
 
-        Address firstDraftForSecondEditor = new Address();
+        Distribution firstDraftForSecondEditor = new Distribution();
         firstDraftForSecondEditor.setInstanceId(baseLinked.getInstanceId());
         firstDraftForSecondEditor.setStatus(StatusType.DRAFT);
 
         ApiResponseMessage firstSecondEditorDraftResponse = EPOSDataModelManager.updateEposDataModelEntity(
-                firstDraftForSecondEditor, secondEditorUser, EntityNames.ADDRESS, Address.class);
+                firstDraftForSecondEditor, secondEditorUser, EntityNames.DISTRIBUTION, Distribution.class);
 
         assertEquals(ApiResponseMessage.OK, firstSecondEditorDraftResponse.getCode());
         assertNotNull(firstSecondEditorDraftResponse.getEntity());
 
-        Address duplicateDraftForSecondEditor = new Address();
+        Distribution duplicateDraftForSecondEditor = new Distribution();
         duplicateDraftForSecondEditor.setInstanceId(baseLinked.getInstanceId());
         duplicateDraftForSecondEditor.setStatus(StatusType.DRAFT);
 
         ApiResponseMessage duplicateResponse = EPOSDataModelManager.updateEposDataModelEntity(
-                duplicateDraftForSecondEditor, secondEditorUser, EntityNames.ADDRESS, Address.class);
+                duplicateDraftForSecondEditor, secondEditorUser, EntityNames.DISTRIBUTION, Distribution.class);
 
         assertEquals(ApiResponseMessage.OK, duplicateResponse.getCode());
         assertNotNull(duplicateResponse.getEntity());
@@ -134,30 +134,28 @@ public class EntityDraftAndReviewerRulesTest extends TestcontainersLifecycle {
     @Test
     @Order(4)
     public void partialSubmitWithUidPreservesThePersistedDraft() {
-        Address draft = buildAddress(testGroup.getId());
+        Distribution draft = buildDistribution(testGroup.getId());
         ApiResponseMessage createResponse = EPOSDataModelManager.createEposDataModelEntity(
-                draft, editorUser, EntityNames.ADDRESS, Address.class);
+                draft, editorUser, EntityNames.DISTRIBUTION, Distribution.class);
         LinkedEntity created = createResponse.getEntity();
 
-        Address submitRequest = new Address();
+        Distribution submitRequest = new Distribution();
         submitRequest.setInstanceId(created.getInstanceId());
         submitRequest.setMetaId(created.getMetaId());
         submitRequest.setUid(created.getUid());
         submitRequest.setStatus(StatusType.SUBMITTED);
 
         ApiResponseMessage submitResponse = EPOSDataModelManager.updateEposDataModelEntity(
-                submitRequest, editorUser, EntityNames.ADDRESS, Address.class);
+                submitRequest, editorUser, EntityNames.DISTRIBUTION, Distribution.class);
         assertEquals(ApiResponseMessage.OK, submitResponse.getCode());
 
-        Address submitted = (Address) EPOSDataModelManager.getEPOSDataModelEposDataModelEntity(
-                created.getMetaId(), created.getInstanceId(), editorUser, EntityNames.ADDRESS, Address.class)
+        Distribution submitted = (Distribution) EPOSDataModelManager.getEPOSDataModelEposDataModelEntity(
+                created.getMetaId(), created.getInstanceId(), editorUser, EntityNames.DISTRIBUTION, Distribution.class)
                 .getListOfEntities().get(0);
         assertEquals(StatusType.SUBMITTED, submitted.getStatus());
-        assertEquals("Italy", submitted.getCountry());
-        assertEquals("IT", submitted.getCountryCode());
-        assertEquals("Via Roma", submitted.getStreet());
-        assertEquals("00100", submitted.getPostalCode());
-        assertEquals("Rome", submitted.getLocality());
+        assertEquals("Draft distribution title", submitted.getTitle().get(0));
+        assertEquals("application/json", submitted.getFormat());
+        assertEquals("https://example.org/license", submitted.getLicence());
     }
 
     @Test
@@ -228,19 +226,15 @@ public class EntityDraftAndReviewerRulesTest extends TestcontainersLifecycle {
         assertEquals("https://example.org/license", submitted.getLicense());
     }
 
-    private static Address buildAddress(String groupId) {
-        Address address = new Address();
-        address.setInstanceId(UUID.randomUUID().toString());
-        address.setMetaId(UUID.randomUUID().toString());
-        address.setUid(UUID.randomUUID().toString());
-        address.setCountry("Italy");
-        address.setCountryCode("IT");
-        address.setStreet("Via Roma");
-        address.setPostalCode("00100");
-        address.setLocality("Rome");
-        address.setStatus(StatusType.DRAFT);
-        address.setGroups(List.of(groupId));
-        return address;
+    private static Distribution buildDistribution(String groupId) {
+        Distribution distribution = new Distribution();
+        distribution.setUid(UUID.randomUUID().toString());
+        distribution.setTitle(List.of("Draft distribution title"));
+        distribution.setFormat("application/json");
+        distribution.setLicence("https://example.org/license");
+        distribution.setStatus(StatusType.DRAFT);
+        distribution.setGroups(List.of(groupId));
+        return distribution;
     }
 
     private static void addUserToGroup(String userId, RoleType role) {

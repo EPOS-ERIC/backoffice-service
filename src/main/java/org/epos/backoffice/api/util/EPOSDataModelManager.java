@@ -33,7 +33,7 @@ import model.StatusType;
 import model.Versioningstatus;
 import usermanagementapis.UserGroupManagementAPI;
 
-public class EPOSDataModelManager {
+    public class EPOSDataModelManager {
 
     private static final Logger log = LoggerFactory.getLogger(EPOSDataModelManager.class);
     private static final RestTemplate restTemplate = new RestTemplate();
@@ -129,6 +129,14 @@ public class EPOSDataModelManager {
 
     public static ApiResponseMessage createEposDataModelEntity(EPOSDataModelEntity obj, User user, EntityNames entityNames, Class clazz) {
         String userId = user != null ? user.getAuthIdentifier() : null;
+        if (isPublishedReferenceEntity(entityNames) && !Boolean.TRUE.equals(user.getIsAdmin())) {
+            log.warn("Entity create rejected: admin-only reference entity userId={} entityType={}", userId, entityNames.name());
+            return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED,
+                    "{\"response\" : \"Only admins can manage this entity type\"}");
+        }
+        if (isPublishedReferenceEntity(entityNames)) {
+            obj.setStatus(StatusType.PUBLISHED);
+        }
         /*if (hasUnauthorizedEditorId(obj, user)) {
             log.warn("Entity create rejected: editorId does not match session userId={} requestedEditorId={} entityType={}",
                     userId, obj.getEditorId(), entityNames.name());
@@ -251,6 +259,15 @@ public class EPOSDataModelManager {
 
     public static ApiResponseMessage updateEposDataModelEntity(EPOSDataModelEntity obj, User user, EntityNames entityNames, Class clazz) {
         String userId = user != null ? user.getAuthIdentifier() : null;
+        if (isPublishedReferenceEntity(entityNames) && !Boolean.TRUE.equals(user.getIsAdmin())) {
+            log.warn("Entity update rejected: admin-only reference entity userId={} entityType={} instanceId={}",
+                    userId, entityNames.name(), obj.getInstanceId());
+            return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED,
+                    "{\"response\" : \"Only admins can manage this entity type\"}");
+        }
+        if (isPublishedReferenceEntity(entityNames)) {
+            obj.setStatus(StatusType.PUBLISHED);
+        }
         if (hasUnauthorizedEditorId(obj, user)) {
             log.warn("Entity update rejected: editorId does not match session userId={} requestedEditorId={} entityType={} instanceId={}",
                     userId, obj.getEditorId(), entityNames.name(), obj.getInstanceId());
@@ -339,14 +356,10 @@ public class EPOSDataModelManager {
                     newStatus);
         }
 
-		if (currentStatus == StatusType.PUBLISHED && newStatus == StatusType.PUBLISHED
-				&& user.getIsAdmin() // only admins should be able to create things as published
-				&& (entityNames.equals(EntityNames.CATEGORYSCHEME)
-						|| entityNames.equals(EntityNames.CATEGORY)
-						|| entityNames.equals(EntityNames.ORGANIZATION)
-						|| entityNames.equals(EntityNames.PERSON)
-						|| entityNames.equals(EntityNames.IDENTIFIER)
-						|| entityNames.equals(EntityNames.ADDRESS))) {
+        if (Boolean.TRUE.equals(user.getIsAdmin())
+                && (isPublishedReferenceEntity(entityNames)
+                || (currentStatus == StatusType.PUBLISHED && newStatus == StatusType.PUBLISHED
+                && (entityNames == EntityNames.PERSON || entityNames == EntityNames.IDENTIFIER)))) {
 			LinkedEntity reference = dbapi.create(entityToSave, null, null, null);
 			return new ApiResponseMessage(ApiResponseMessage.OK, reference);
 		}
@@ -517,6 +530,14 @@ public class EPOSDataModelManager {
             return requestedEditorId;
         }
         return user.getAuthIdentifier();
+    }
+
+    private static boolean isPublishedReferenceEntity(EntityNames entityNames) {
+        return entityNames == EntityNames.ADDRESS
+                || entityNames == EntityNames.CATEGORY
+                || entityNames == EntityNames.CATEGORYSCHEME
+                || entityNames == EntityNames.CONTACTPOINT
+                || entityNames == EntityNames.ORGANIZATION;
     }
 
     // ==================== PERMISSION HELPER METHODS ====================
@@ -924,6 +945,12 @@ public class EPOSDataModelManager {
         EposDataModelDAO.getInstance().clearAllCaches();
         AbstractAPI dbapi = AbstractAPI.retrieveAPI(entityNames.name());
         String userId = user != null ? user.getAuthIdentifier() : null;
+
+        if (isPublishedReferenceEntity(entityNames) && !Boolean.TRUE.equals(user.getIsAdmin())) {
+            log.warn("Entity delete rejected: admin-only reference entity userId={} entityType={} instanceId={}",
+                    userId, entityNames.name(), instance_id);
+            return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "Only admins can manage this entity type");
+        }
 
         log.debug("Entity delete request userId={} entityType={} instanceId={}", userId, entityNames.name(), instance_id);
         
