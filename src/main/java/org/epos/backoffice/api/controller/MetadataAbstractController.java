@@ -24,6 +24,14 @@ public abstract class MetadataAbstractController<T extends EPOSDataModelEntity> 
 	public MetadataAbstractController(ObjectMapper objectMapper, HttpServletRequest request, Class<T> entityType) {
 		super(objectMapper, request, entityType);
 	}
+
+	EntityNames getEntityName() {
+		if (SoftwareApplicationParameter.class.equals(entityType)) {
+			return EntityNames.SOFTWAREAPPLICATIONINPUTPARAMETER;
+		}
+		return EntityNames.valueOf(entityType.getSimpleName().toUpperCase());
+	}
+
 	protected ResponseEntity<?> getMethod(String meta_id, String instance_id, Boolean available_section) {
 
 		if (meta_id == null)
@@ -45,7 +53,7 @@ public abstract class MetadataAbstractController<T extends EPOSDataModelEntity> 
 				meta_id,
 				instance_id,
 				user,
-				EntityNames.valueOf(entityType.getSimpleName().toUpperCase()),
+				getEntityName(),
 				entityType);
 		List items = response.getListOfEntities();
 
@@ -70,7 +78,7 @@ public abstract class MetadataAbstractController<T extends EPOSDataModelEntity> 
 
 
 	protected ResponseEntity<?> deleteMethod(String instance_id) {
-		dbapi = AbstractAPI.retrieveAPI(EntityNames.valueOf(entityType.getSimpleName().toUpperCase()).name());
+		dbapi = AbstractAPI.retrieveAPI(getEntityName().name());
 		if (instance_id == null)
 			return ResponseEntity
 					.status(400)
@@ -83,7 +91,7 @@ public abstract class MetadataAbstractController<T extends EPOSDataModelEntity> 
 		}
 
 		if(!entityType.equals(User.class)) {
-			ApiResponseMessage response = EPOSDataModelManager.deleteEposDataModelEntity(instance_id,user,EntityNames.valueOf(entityType.getSimpleName().toUpperCase()),entityType);
+			ApiResponseMessage response = EPOSDataModelManager.deleteEposDataModelEntity(instance_id,user,getEntityName(),entityType);
 			if(response.getCode() == ApiResponseMessage.OK) {
 				return ResponseEntity.status(200).body(response);
 			} else if(response.getCode() == ApiResponseMessage.UNAUTHORIZED) {
@@ -99,7 +107,7 @@ public abstract class MetadataAbstractController<T extends EPOSDataModelEntity> 
 	}
 
 	protected ResponseEntity<?> postMethod(EPOSDataModelEntity body, boolean takeCareOfTheParent) {
-		dbapi = AbstractAPI.retrieveAPI(EntityNames.valueOf(entityType.getSimpleName().toUpperCase()).name());
+		dbapi = AbstractAPI.retrieveAPI(getEntityName().name());
 
 		User user = getUserFromSession();
 		if (user == null) {
@@ -108,7 +116,7 @@ public abstract class MetadataAbstractController<T extends EPOSDataModelEntity> 
 		}
 
 		if(!entityType.equals(User.class)) {
-			ApiResponseMessage response = EPOSDataModelManager.createEposDataModelEntity(body,user,EntityNames.valueOf(entityType.getSimpleName().toUpperCase()),entityType);
+			ApiResponseMessage response = EPOSDataModelManager.createEposDataModelEntity(body,user,getEntityName(),entityType);
 			if(response.getCode() == ApiResponseMessage.OK) {
 				return ResponseEntity.status(201).body(response.getEntity());
 			} else if(response.getCode() == ApiResponseMessage.UNAUTHORIZED) {
@@ -122,7 +130,7 @@ public abstract class MetadataAbstractController<T extends EPOSDataModelEntity> 
 	}
 
 	protected ResponseEntity<?> updateMethod(EPOSDataModelEntity body, boolean takeCareOfTheParent) {
-		dbapi = AbstractAPI.retrieveAPI(EntityNames.valueOf(entityType.getSimpleName().toUpperCase()).name());
+		dbapi = AbstractAPI.retrieveAPI(getEntityName().name());
 
 		User user = getUserFromSession();
 		if (user == null) {
@@ -131,7 +139,7 @@ public abstract class MetadataAbstractController<T extends EPOSDataModelEntity> 
 		}
 
 		if(!entityType.equals(User.class)) {
-			ApiResponseMessage response = EPOSDataModelManager.updateEposDataModelEntity(body,user,EntityNames.valueOf(entityType.getSimpleName().toUpperCase()),entityType);
+			ApiResponseMessage response = EPOSDataModelManager.updateEposDataModelEntity(body,user,getEntityName(),entityType);
 			if(response.getCode() == ApiResponseMessage.OK) {
 				return ResponseEntity.status(201).body(response.getEntity());
 			} else if(response.getCode() == ApiResponseMessage.UNAUTHORIZED) {
