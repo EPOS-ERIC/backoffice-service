@@ -30,13 +30,13 @@ public class GroupManager {
 
 		List<Group> groupList;
 		if (instance_id.equals("all")) {
-			List<Group> retrievedGroups = UserGroupManagementAPI.retrieveAllGroups();
+			List<Group> retrievedGroups = UserGroupManagementAPI.retrieveAllGroups(available_section);
 			groupList = retrievedGroups != null ? retrievedGroups : new ArrayList<>();
 			if (retrievedGroups == null) {
 				log.warn("Group read returned null list requester={} target=all", requesterId);
 			}
 		} else {
-			Group tempGroup = Optional.ofNullable(UserGroupManagementAPI.retrieveGroupById(instance_id)).orElse(null);
+			Group tempGroup = Optional.ofNullable(UserGroupManagementAPI.retrieveGroupById(instance_id, available_section)).orElse(null);
 			groupList = tempGroup != null ? List.of(tempGroup) : new ArrayList<>();
 			if (tempGroup == null) {
 				log.warn("Group read target not found requester={} targetGroupId={}", requesterId, instance_id);

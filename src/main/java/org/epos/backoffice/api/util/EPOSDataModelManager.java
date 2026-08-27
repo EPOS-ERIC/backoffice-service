@@ -129,6 +129,12 @@ import usermanagementapis.UserGroupManagementAPI;
 
     public static ApiResponseMessage createEposDataModelEntity(EPOSDataModelEntity obj, User user, EntityNames entityNames, Class clazz) {
         String userId = user != null ? user.getAuthIdentifier() : null;
+        if (obj.getInstanceId() == null && hasUnauthorizedEditorId(obj, user)) {
+            log.warn("Entity create rejected: editorId does not match session userId={} requestedEditorId={} entityType={}",
+                    userId, obj.getEditorId(), entityNames.name());
+            return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED,
+                    "{\"response\" : \"Only an admin can set a different editorId\"}");
+        }
         if (isPublishedReferenceEntity(entityNames) && !Boolean.TRUE.equals(user.getIsAdmin())) {
             log.warn("Entity create rejected: admin-only reference entity userId={} entityType={}", userId, entityNames.name());
             return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED,
@@ -137,12 +143,6 @@ import usermanagementapis.UserGroupManagementAPI;
         if (isPublishedReferenceEntity(entityNames)) {
             obj.setStatus(StatusType.PUBLISHED);
         }
-        /*if (hasUnauthorizedEditorId(obj, user)) {
-            log.warn("Entity create rejected: editorId does not match session userId={} requestedEditorId={} entityType={}",
-                    userId, obj.getEditorId(), entityNames.name());
-            return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED,
-                    "{\"response\" : \"Only an admin can set a different editorId\"}");
-        }*/
         String editorId = getEffectiveEditorId(obj, user);
 
         EposDataModelDAO.getInstance().clearAllCaches();
@@ -157,7 +157,18 @@ import usermanagementapis.UserGroupManagementAPI;
         if(obj.getInstanceId() != null) {
             existingEntity = (EPOSDataModelEntity) dbapi.retrieve(obj.getInstanceId());
 	                if(existingEntity != null) {
-                // Check if user can READ the existing entity (to copy from it)
+                    boolean copiesExistingEditor = existingEntity.getEditorId() != null
+                            && existingEntity.getEditorId().equals(obj.getEditorId());
+                    if (hasUnauthorizedEditorId(obj, user) && !copiesExistingEditor) {
+                        log.warn("Entity create rejected: editorId does not match session userId={} requestedEditorId={} entityType={}",
+                                userId, obj.getEditorId(), entityNames.name());
+                        return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED,
+                                "{\"response\" : \"Only an admin can set a different editorId\"}");
+                    }
+                    if (copiesExistingEditor && !Boolean.TRUE.equals(user.getIsAdmin())) {
+                        editorId = userId;
+                    }
+                    // Check if user can READ the existing entity (to copy from it)
                 if(!checkUserPermissionsReadOnly(existingEntity, user, userGroupRoles)) {
                     log.warn("Entity create rejected: source entity unreadable userId={} entityType={} sourceInstanceId={} metaId={}",
                             userId, entityNames.name(), existingEntity.getInstanceId(), existingEntity.getMetaId());
@@ -184,8 +195,15 @@ import usermanagementapis.UserGroupManagementAPI;
                             userId, entityNames.name(), obj.getMetaId(), obj.getInstanceId(), obj.getStatus());
                     return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "{\"response\" : \"The user can't create an entity with this status\"}");
                 }
-            }
+                }
             obj.setInstanceChangedId(obj.getInstanceId());
+        }
+
+        if (existingEntity == null && hasUnauthorizedEditorId(obj, user)) {
+            log.warn("Entity create rejected: editorId does not match session userId={} requestedEditorId={} entityType={}",
+                    userId, obj.getEditorId(), entityNames.name());
+            return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED,
+                    "{\"response\" : \"Only an admin can set a different editorId\"}");
         }
         
         // For brand new entities (no existing entity), determine groups
@@ -259,20 +277,17 @@ import usermanagementapis.UserGroupManagementAPI;
 
     public static ApiResponseMessage updateEposDataModelEntity(EPOSDataModelEntity obj, User user, EntityNames entityNames, Class clazz) {
         String userId = user != null ? user.getAuthIdentifier() : null;
-        if (isPublishedReferenceEntity(entityNames) && !Boolean.TRUE.equals(user.getIsAdmin())) {
-            log.warn("Entity update rejected: admin-only reference entity userId={} entityType={} instanceId={}",
-                    userId, entityNames.name(), obj.getInstanceId());
-            return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED,
-                    "{\"response\" : \"Only admins can manage this entity type\"}");
-        }
-        if (isPublishedReferenceEntity(entityNames)) {
-            obj.setStatus(StatusType.PUBLISHED);
-        }
         if (hasUnauthorizedEditorId(obj, user)) {
             log.warn("Entity update rejected: editorId does not match session userId={} requestedEditorId={} entityType={} instanceId={}",
                     userId, obj.getEditorId(), entityNames.name(), obj.getInstanceId());
             return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED,
                     "{\"response\" : \"Only an admin can set a different editorId\"}");
+        }
+        if (isPublishedReferenceEntity(entityNames) && !Boolean.TRUE.equals(user.getIsAdmin())) {
+            log.warn("Entity update rejected: admin-only reference entity userId={} entityType={} instanceId={}",
+                    userId, entityNames.name(), obj.getInstanceId());
+            return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED,
+                    "{\"response\" : \"Only admins can manage this entity type\"}");
         }
         String editorId = getEffectiveEditorId(obj, user);
 
@@ -321,7 +336,8 @@ import usermanagementapis.UserGroupManagementAPI;
                 || (currentStatus == StatusType.SUBMITTED
                 && (newStatus == StatusType.PUBLISHED || newStatus == StatusType.DISCARDED))
                 || (currentStatus == StatusType.PUBLISHED
-                && (newStatus == StatusType.ARCHIVED || newStatus == StatusType.DISCARDED));
+                && (newStatus == StatusType.SUBMITTED
+                || newStatus == StatusType.ARCHIVED || newStatus == StatusType.DISCARDED));
         EPOSDataModelEntity entityToSave = statusOnlyTransition || obj.getUid() == null ? existingEntity : obj;
 
         // Lifecycle requests are often sparse, but a DataProduct submit can
@@ -357,9 +373,9 @@ import usermanagementapis.UserGroupManagementAPI;
         }
 
         if (Boolean.TRUE.equals(user.getIsAdmin())
+                && currentStatus == StatusType.PUBLISHED && newStatus == StatusType.PUBLISHED
                 && (isPublishedReferenceEntity(entityNames)
-                || (currentStatus == StatusType.PUBLISHED && newStatus == StatusType.PUBLISHED
-                && (entityNames == EntityNames.PERSON || entityNames == EntityNames.IDENTIFIER)))) {
+                || entityNames == EntityNames.PERSON || entityNames == EntityNames.IDENTIFIER)) {
 			LinkedEntity reference = dbapi.create(entityToSave, null, null, null);
 			return new ApiResponseMessage(ApiResponseMessage.OK, reference);
 		}
@@ -407,12 +423,12 @@ import usermanagementapis.UserGroupManagementAPI;
 
         // PUBLISHED -> ARCHIVED/DISCARDED: Direct status change (no new version)
         if (currentStatus == StatusType.PUBLISHED && (newStatus == StatusType.ARCHIVED || newStatus == StatusType.DISCARDED)) {
-            LinkedEntity reference = dbapi.create(entityToSave, null, null, null);
+            LinkedEntity reference = dbapi.create(entityToSave, newStatus, null, null);
             return new ApiResponseMessage(ApiResponseMessage.OK, reference);
         }
 
         if ((currentStatus == StatusType.DRAFT || currentStatus == StatusType.SUBMITTED) && newStatus == StatusType.DISCARDED) {
-            LinkedEntity reference = dbapi.create(entityToSave, null, null, null);
+            LinkedEntity reference = dbapi.create(entityToSave, newStatus, null, null);
 
             if (currentStatus == StatusType.SUBMITTED) {
                 EPOSDataModelEntity entity = (EPOSDataModelEntity) dbapi.retrieve(reference.getInstanceId());
@@ -436,8 +452,9 @@ import usermanagementapis.UserGroupManagementAPI;
             entityToSave.setInstanceChangedId(existingEntity.getInstanceId());
             entityToSave.setEditorId(editorId);
 
-            LinkedEntity reference = dbapi.create(entityToSave, null, null, null);
+            entityToSave = prepareSharedDataProductDraft(entityToSave, editorId);
 
+            LinkedEntity reference = dbapi.create(entityToSave, newStatus, null, null);
             if(existingEntity.getGroups() != null) {
                 for(String gid : existingEntity.getGroups()) {
                     UserGroupManagementAPI.addMetadataElementToGroup(reference.getMetaId(), gid);
@@ -452,7 +469,7 @@ import usermanagementapis.UserGroupManagementAPI;
             //if (!user.getIsAdmin() && !user.getAuthIdentifier().equals(existingEntity.getEditorId())) {
             //    return new ApiResponseMessage(ApiResponseMessage.UNAUTHORIZED, "{\"response\" : \"Only the DRAFT owner or Admin can submit.\"}");
             //}
-            LinkedEntity reference = dbapi.create(entityToSave, null, null, null);
+            LinkedEntity reference = dbapi.create(entityToSave, newStatus, null, null);
 
             EPOSDataModelEntity entity = (EPOSDataModelEntity) dbapi.retrieve(reference.getInstanceId());
             EmailWrapper.wrapSubmitted(entity,user,entity.getMetaId(), entity.getInstanceId());
@@ -496,6 +513,48 @@ import usermanagementapis.UserGroupManagementAPI;
                 dbapi.create(entity, null, null, null);
             }
         }
+    }
+
+    private static EPOSDataModelEntity prepareSharedDataProductDraft(EPOSDataModelEntity entity, String editorId) {
+        if (!(entity instanceof DataProduct dataProduct) || dataProduct.getDistribution() == null) {
+            return entity;
+        }
+
+        AbstractAPI distributionApi = AbstractAPI.retrieveAPI(EntityNames.DISTRIBUTION.name());
+        List<LinkedEntity> preparedDistributions = new ArrayList<>();
+        for (LinkedEntity distributionLink : dataProduct.getDistribution()) {
+            Distribution distribution = (Distribution) distributionApi.retrieve(distributionLink.getInstanceId());
+            if (distribution == null || distribution.getAccessService() == null) {
+                preparedDistributions.add(distributionLink);
+                continue;
+            }
+
+            List<LinkedEntity> sharedServices = new ArrayList<>();
+            boolean sharedDraftFound = false;
+            for (LinkedEntity serviceLink : distribution.getAccessService()) {
+                String draftId = findDraftForUserAndMeta(serviceLink.getMetaId(), editorId);
+                if (draftId != null) {
+                    sharedServices.add(AbstractAPI.retrieveAPI(EntityNames.WEBSERVICE.name())
+                            .retrieveLinkedEntity(draftId));
+                    sharedDraftFound = true;
+                } else {
+                    sharedServices.add(serviceLink);
+                }
+            }
+
+            if (!sharedDraftFound) {
+                preparedDistributions.add(distributionLink);
+                continue;
+            }
+
+            distribution.setInstanceId(null);
+            distribution.setStatus(StatusType.DRAFT);
+            distribution.setEditorId(editorId);
+            distribution.setAccessService(sharedServices);
+            preparedDistributions.add(distributionApi.create(distribution, null, null, null));
+        }
+        dataProduct.setDistribution(preparedDistributions);
+        return dataProduct;
     }
 
     private static String findDraftForUserAndMeta(String metaId, String editorId) {
