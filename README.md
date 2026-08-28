@@ -334,3 +334,22 @@ The service is a java application which use spring
 ## Environment Variable
 
 - **BASECONTEXT**: the context path which is at the beginning of the path. Is mandatory.
+## Orphan Registry Cleanup
+
+An administrator can inspect stale metadata registry entries with:
+
+```bash
+curl -b cookies.txt https://HOST/admin/orphans
+```
+
+The endpoint is read-only and returns `meta_id` entries present in
+`edm_entity_id` but no longer present in any main metadata table. To remove
+them, review the response first and then call:
+
+```bash
+curl -X DELETE -b cookies.txt \
+  'https://HOST/admin/orphans?confirm=ORPHANS'
+```
+
+The cleanup removes group references before removing the registry entry. Both
+operations require an authenticated backoffice administrator.

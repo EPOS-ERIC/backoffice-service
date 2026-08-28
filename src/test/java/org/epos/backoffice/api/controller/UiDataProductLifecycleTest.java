@@ -25,6 +25,7 @@ import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -43,6 +44,9 @@ class UiDataProductLifecycleTest extends TestcontainersLifecycle {
     @Test
     void transitionsTheUiDataProductWithoutCreatingASubmittedVersion() throws Exception {
         DataProduct payload = readUiPayload();
+        payload.setMetaId(UUID.randomUUID().toString());
+        payload.setUid(UUID.randomUUID().toString());
+        payload.setInstanceId(null);
         payload.setStatus(StatusType.PUBLISHED);
         DataProduct published = retrieve(EPOSDataModelManager.createEposDataModelEntity(
                 payload, admin, EntityNames.DATAPRODUCT, DataProduct.class).getEntity());
@@ -83,13 +87,13 @@ class UiDataProductLifecycleTest extends TestcontainersLifecycle {
     @Test
     void submittingUiDataProductKeepsModifiedDraftDistribution() throws Exception {
         Mapping sourceMapping = new Mapping();
-        sourceMapping.setUid("https://example.org/mapping/ui-lifecycle");
+        sourceMapping.setUid("https://example.org/mapping/ui-lifecycle/" + UUID.randomUUID());
         sourceMapping.setStatus(StatusType.PUBLISHED);
         Mapping publishedMapping = retrieveMapping(EPOSDataModelManager.createEposDataModelEntity(
                 sourceMapping, admin, EntityNames.MAPPING, Mapping.class).getEntity());
 
         Operation sourceOperation = new Operation();
-        sourceOperation.setUid("https://example.org/operation/ui-lifecycle");
+        sourceOperation.setUid("https://example.org/operation/ui-lifecycle/" + UUID.randomUUID());
         sourceOperation.setStatus(StatusType.PUBLISHED);
         sourceOperation.setMapping(List.of(new LinkedEntity()
                 .entityType(EntityNames.MAPPING.name())
@@ -100,7 +104,7 @@ class UiDataProductLifecycleTest extends TestcontainersLifecycle {
                 sourceOperation, admin, EntityNames.OPERATION, Operation.class).getEntity());
 
         WebService sourceWebService = new WebService();
-        sourceWebService.setUid("https://example.org/webservice/ui-lifecycle");
+        sourceWebService.setUid("https://example.org/webservice/ui-lifecycle/" + UUID.randomUUID());
         sourceWebService.setName("UI lifecycle WebService");
         sourceWebService.setStatus(StatusType.PUBLISHED);
         sourceWebService.setSupportedOperation(List.of(new LinkedEntity()
@@ -112,7 +116,7 @@ class UiDataProductLifecycleTest extends TestcontainersLifecycle {
                 sourceWebService, admin, EntityNames.WEBSERVICE, WebService.class).getEntity());
 
         Distribution sourceDistribution = new Distribution();
-        sourceDistribution.setUid("https://www.epos-eu.org/epos-dcat-ap/NearFaultObservatory/KOERI/WAVEFORM_CONTINUOUS/Distribution/001");
+        sourceDistribution.setUid("https://www.epos-eu.org/epos-dcat-ap/NearFaultObservatory/KOERI/WAVEFORM_CONTINUOUS/Distribution/" + UUID.randomUUID());
         sourceDistribution.setTitle(List.of("Original distribution title"));
         sourceDistribution.setDescription(List.of("Original distribution description"));
         sourceDistribution.setFormat("application/json");
@@ -127,6 +131,9 @@ class UiDataProductLifecycleTest extends TestcontainersLifecycle {
                 sourceDistribution, admin, EntityNames.DISTRIBUTION, Distribution.class).getEntity());
 
         DataProduct payload = readUiPayload();
+        payload.setMetaId(UUID.randomUUID().toString());
+        payload.setUid(UUID.randomUUID().toString());
+        payload.setInstanceId(null);
         payload.setDistribution(List.of(new LinkedEntity()
                 .entityType(EntityNames.DISTRIBUTION.name())
                 .instanceId(publishedDistribution.getInstanceId())
@@ -188,14 +195,14 @@ class UiDataProductLifecycleTest extends TestcontainersLifecycle {
     @Test
     void transitionsSpatialAndTemporalExtentsForDataProductAndWebService() throws Exception {
         Location sourceLocation = new Location();
-        sourceLocation.setUid("https://example.org/location/ui-lifecycle");
+        sourceLocation.setUid("https://example.org/location/ui-lifecycle/" + UUID.randomUUID());
         sourceLocation.setLocation("POINT(12.5 41.9)");
         sourceLocation.setStatus(StatusType.PUBLISHED);
         Location publishedLocation = retrieveLocation(EPOSDataModelManager.createEposDataModelEntity(
                 sourceLocation, admin, EntityNames.LOCATION, Location.class).getEntity());
 
         PeriodOfTime sourcePeriod = new PeriodOfTime();
-        sourcePeriod.setUid("https://example.org/period/ui-lifecycle");
+        sourcePeriod.setUid("https://example.org/period/ui-lifecycle/" + UUID.randomUUID());
         sourcePeriod.setStartDate(LocalDateTime.of(2020, 1, 1, 0, 0));
         sourcePeriod.setEndDate(LocalDateTime.of(2020, 12, 31, 0, 0));
         sourcePeriod.setStatus(StatusType.PUBLISHED);
@@ -203,6 +210,9 @@ class UiDataProductLifecycleTest extends TestcontainersLifecycle {
                 sourcePeriod, admin, EntityNames.PERIODOFTIME, PeriodOfTime.class).getEntity());
 
         DataProduct sourceDataProduct = readUiPayload();
+        sourceDataProduct.setMetaId(UUID.randomUUID().toString());
+        sourceDataProduct.setUid(UUID.randomUUID().toString());
+        sourceDataProduct.setInstanceId(null);
         sourceDataProduct.setStatus(StatusType.PUBLISHED);
         sourceDataProduct.setSpatialExtent(List.of(link(publishedLocation, EntityNames.LOCATION)));
         sourceDataProduct.setTemporalExtent(List.of(link(publishedPeriod, EntityNames.PERIODOFTIME)));
@@ -213,12 +223,27 @@ class UiDataProductLifecycleTest extends TestcontainersLifecycle {
         DataProduct submittedDataProduct = transitionToSubmitted(draftDataProduct, EntityNames.DATAPRODUCT, DataProduct.class);
         assertExtentStatuses(submittedDataProduct.getSpatialExtent().get(0), submittedDataProduct.getTemporalExtent().get(0), StatusType.SUBMITTED);
 
+        Location webServiceLocation = new Location();
+        webServiceLocation.setUid("https://example.org/location/ui-lifecycle-webservice/" + UUID.randomUUID());
+        webServiceLocation.setLocation("POINT(12.5 41.9)");
+        webServiceLocation.setStatus(StatusType.PUBLISHED);
+        Location publishedWebServiceLocation = retrieveLocation(EPOSDataModelManager.createEposDataModelEntity(
+                webServiceLocation, admin, EntityNames.LOCATION, Location.class).getEntity());
+
+        PeriodOfTime webServicePeriod = new PeriodOfTime();
+        webServicePeriod.setUid("https://example.org/period/ui-lifecycle-webservice/" + UUID.randomUUID());
+        webServicePeriod.setStartDate(LocalDateTime.of(2020, 1, 1, 0, 0));
+        webServicePeriod.setEndDate(LocalDateTime.of(2020, 12, 31, 0, 0));
+        webServicePeriod.setStatus(StatusType.PUBLISHED);
+        PeriodOfTime publishedWebServicePeriod = retrievePeriod(EPOSDataModelManager.createEposDataModelEntity(
+                webServicePeriod, admin, EntityNames.PERIODOFTIME, PeriodOfTime.class).getEntity());
+
         WebService sourceWebService = new WebService();
-        sourceWebService.setUid("https://example.org/webservice/extents-ui-lifecycle");
+        sourceWebService.setUid("https://example.org/webservice/extents-ui-lifecycle/" + UUID.randomUUID());
         sourceWebService.setName("WebService extents lifecycle");
         sourceWebService.setStatus(StatusType.PUBLISHED);
-        sourceWebService.setSpatialExtent(new ArrayList<>(List.of(link(publishedLocation, EntityNames.LOCATION))));
-        sourceWebService.setTemporalExtent(List.of(link(publishedPeriod, EntityNames.PERIODOFTIME)));
+        sourceWebService.setSpatialExtent(new ArrayList<>(List.of(link(publishedWebServiceLocation, EntityNames.LOCATION))));
+        sourceWebService.setTemporalExtent(List.of(link(publishedWebServicePeriod, EntityNames.PERIODOFTIME)));
         WebService publishedWebService = retrieveWebService(EPOSDataModelManager.createEposDataModelEntity(
                 sourceWebService, admin, EntityNames.WEBSERVICE, WebService.class).getEntity());
         WebService draftWebService = transitionToDraft(publishedWebService, EntityNames.WEBSERVICE, WebService.class);
@@ -233,7 +258,16 @@ class UiDataProductLifecycleTest extends TestcontainersLifecycle {
             ObjectMapper mapper = new ObjectMapper()
                     .registerModule(new JavaTimeModule())
                     .registerModule(new ThreeTenModule());
-            return mapper.readValue(input, DataProduct[].class)[0];
+            DataProduct payload = mapper.readValue(input, DataProduct[].class)[0];
+            // The fixture contains production references; lifecycle tests create their own relations.
+            payload.setCategory(null);
+            payload.setContactPoint(null);
+            payload.setDistribution(null);
+            payload.setIdentifier(null);
+            payload.setPublisher(null);
+            payload.setSpatialExtent(null);
+            payload.setTemporalExtent(null);
+            return payload;
         }
     }
 
