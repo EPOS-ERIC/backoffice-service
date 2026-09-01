@@ -57,6 +57,10 @@ public class MaintenanceController {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("running", MaintenanceScheduler.isRunning());
         result.put("intervalSeconds", MaintenanceScheduler.getInterval().toSeconds());
+        result.put("runCount", MaintenanceScheduler.getRunCount());
+        result.put("lastRunStarted", MaintenanceScheduler.getLastRunStarted());
+        result.put("lastRunCompleted", MaintenanceScheduler.getLastRunCompleted());
+        result.put("lastError", MaintenanceScheduler.getLastError());
         return result;
     }
 
