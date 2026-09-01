@@ -59,6 +59,11 @@ public class OrphanCleanupController {
         return ResponseEntity.ok(scan(true));
     }
 
+    /** Invoked by the explicit maintenance scheduler without an HTTP request. */
+    public Map<String, Object> runScheduledCleanup() {
+        return scan(true);
+    }
+
     private boolean isAdmin() {
         if (request.getSession(false) == null) return false;
         User user = (User) request.getSession(false).getAttribute("user");
