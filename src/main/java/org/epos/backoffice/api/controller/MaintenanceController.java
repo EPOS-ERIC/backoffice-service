@@ -24,27 +24,27 @@ public class MaintenanceController {
 
     @PostMapping("/start")
     public ResponseEntity<?> start() {
-        if (isAdmin()) return forbidden();
+        if (!isAdmin()) return forbidden();
         MaintenanceScheduler.start(Duration.ofMinutes(10), orphanCleanup::runScheduledCleanup);
         return ResponseEntity.ok(status());
     }
 
     @PostMapping("/stop")
     public ResponseEntity<?> stop() {
-        if (isAdmin()) return forbidden();
+        if (!isAdmin()) return forbidden();
         MaintenanceScheduler.stop();
         return ResponseEntity.ok(status());
     }
 
     @PostMapping("/run")
     public ResponseEntity<?> runNow() {
-        if (isAdmin()) return forbidden();
+        if (!isAdmin()) return forbidden();
         return ResponseEntity.ok(orphanCleanup.runScheduledCleanup());
     }
 
     @GetMapping("/status")
     public ResponseEntity<?> statusEndpoint() {
-        if (isAdmin()) return forbidden();
+        if (!isAdmin()) return forbidden();
         return ResponseEntity.ok(status());
     }
 
@@ -61,9 +61,9 @@ public class MaintenanceController {
     }
 
     private boolean isAdmin() {
-        if (request.getSession(false) == null) return true;
+        if (request.getSession(false) == null) return false;
         User user = (User) request.getSession(false).getAttribute("user");
-        return user == null || !user.getIsAdmin();
+        return user != null && Boolean.TRUE.equals(user.getIsAdmin());
     }
 
     private ResponseEntity<?> forbidden() {
