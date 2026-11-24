@@ -89,13 +89,15 @@ public class MigrationController implements ApiDocTag{
             @ApiResponse(responseCode = "415", description = "Wrong media type"),
             @ApiResponse(responseCode = "500", description = "Error executing the request, the error may be, either in the gateway or the backoffice-service")
     })
-    public ResponseEntity<?> getDataset() {
+    public ResponseEntity<?> getDataset(
+            @PathVariable String meta_id,
+            @PathVariable String instance_id) {
         User user = getUserFromSession();
         if (user == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized: User not found in session.");
         }
 
-        return ResponseEntity.status(HttpStatus.OK).body(MigrationExecution.getListOfObjects(user));
+        return ResponseEntity.status(HttpStatus.OK).body(MigrationExecution.getDataset(meta_id, instance_id, user));
     }
 
     @RequestMapping(
@@ -112,13 +114,15 @@ public class MigrationController implements ApiDocTag{
             @ApiResponse(responseCode = "415", description = "Wrong media type"),
             @ApiResponse(responseCode = "500", description = "Error executing the request, the error may be, either in the gateway or the backoffice-service")
     })
-    public ResponseEntity<?> getSoftwareApplication() {
+    public ResponseEntity<?> getSoftwareApplication(
+            @PathVariable String meta_id,
+            @PathVariable String instance_id) {
         User user = getUserFromSession();
         if (user == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized: User not found in session.");
         }
 
-        return ResponseEntity.status(HttpStatus.OK).body(MigrationExecution.getListOfObjects(user));
+        return ResponseEntity.status(HttpStatus.OK).body(MigrationExecution.getSoftwareApplication(meta_id, instance_id, user));
     }
 
     @RequestMapping(
@@ -135,12 +139,14 @@ public class MigrationController implements ApiDocTag{
             @ApiResponse(responseCode = "415", description = "Wrong media type"),
             @ApiResponse(responseCode = "500", description = "Error executing the request, the error may be, either in the gateway or the backoffice-service")
     })
-    public ResponseEntity<?> getSoftwareSourceCode() {
+    public ResponseEntity<?> getSoftwareSourceCode(
+            @PathVariable String meta_id,
+            @PathVariable String instance_id) {
         User user = getUserFromSession();
         if (user == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized: User not found in session.");
         }
 
-        return ResponseEntity.status(HttpStatus.OK).body(MigrationExecution.getListOfObjects(user));
+        return ResponseEntity.status(HttpStatus.OK).body(MigrationExecution.getSoftwareSourceCode(meta_id, instance_id, user));
     }
 }
