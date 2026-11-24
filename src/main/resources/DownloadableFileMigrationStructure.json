@@ -1,0 +1,54 @@
+{
+  "resource_type": "dataset",
+  "metadata": {
+    "title": "",
+    "description": "",
+    "keywords": [
+      ""
+    ],
+    "accrual_periodicity": "TRIENNIAL",
+    "quality_annotation": null,
+    "access_right": "NON_PUBLIC",
+    "distributions": [
+      {
+        "resource_id": "",
+        "title": "",
+        "description": "",
+        "license": null,
+        "type": "DOWNLOADABLE_FILE",
+        "byte_size": 1,
+        "downloadable_file": {
+          "url": "",
+          "format": ""
+        }
+      }
+    ],
+    "spatial_coverage": "POINT (12.5 41.9)",
+    "temporal_coverage": {
+      "start": null,
+      "end": null
+    },
+    "geological_temporal_coverage": {
+      "start_mya": 0,
+      "end_mya": 0
+    },
+    "persistent_identifiers": [
+      {
+        "resource_id": "",
+        "type": "",
+        "value": ""
+      }
+    ],
+    "contact_points": [
+      ""
+    ],
+    "providers": [
+      ""
+    ],
+    "categories": [
+      ""
+    ],
+    "created": null,
+    "updated": null
+  }
+}
