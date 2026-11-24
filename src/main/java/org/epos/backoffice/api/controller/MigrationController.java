@@ -74,4 +74,73 @@ public class MigrationController implements ApiDocTag{
 
         return ResponseEntity.status(HttpStatus.OK).body(MigrationExecution.getListOfObjects(user));
     }
+
+    @RequestMapping(
+            value = "/dataset/{meta_id}/{instance_id}",
+            produces = {"application/json"},
+            method = RequestMethod.GET)
+    @ResponseBody
+    @Operation(summary = "Get Dataset", description = "**** MIGRATION USE ONLY")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "The Dataset are correctly retrieved", content = @Content(mediaType = "application/json")),
+            @ApiResponse(responseCode = "400", description = "Bad request."),
+            @ApiResponse(responseCode = "401", description = "Token is missing or invalid"),
+            @ApiResponse(responseCode = "404", description = "Not found"),
+            @ApiResponse(responseCode = "415", description = "Wrong media type"),
+            @ApiResponse(responseCode = "500", description = "Error executing the request, the error may be, either in the gateway or the backoffice-service")
+    })
+    public ResponseEntity<?> getDataset() {
+        User user = getUserFromSession();
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized: User not found in session.");
+        }
+
+        return ResponseEntity.status(HttpStatus.OK).body(MigrationExecution.getListOfObjects(user));
+    }
+
+    @RequestMapping(
+            value = "/softwareapplication/{meta_id}/{instance_id}",
+            produces = {"application/json"},
+            method = RequestMethod.GET)
+    @ResponseBody
+    @Operation(summary = "Get Software Application", description = "**** MIGRATION USE ONLY")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "The Software Application are correctly retrieved", content = @Content(mediaType = "application/json")),
+            @ApiResponse(responseCode = "400", description = "Bad request."),
+            @ApiResponse(responseCode = "401", description = "Token is missing or invalid"),
+            @ApiResponse(responseCode = "404", description = "Not found"),
+            @ApiResponse(responseCode = "415", description = "Wrong media type"),
+            @ApiResponse(responseCode = "500", description = "Error executing the request, the error may be, either in the gateway or the backoffice-service")
+    })
+    public ResponseEntity<?> getSoftwareApplication() {
+        User user = getUserFromSession();
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized: User not found in session.");
+        }
+
+        return ResponseEntity.status(HttpStatus.OK).body(MigrationExecution.getListOfObjects(user));
+    }
+
+    @RequestMapping(
+            value = "/softwaresourcecode/{meta_id}/{instance_id}",
+            produces = {"application/json"},
+            method = RequestMethod.GET)
+    @ResponseBody
+    @Operation(summary = "Get Software Source Code", description = "**** MIGRATION USE ONLY")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "The Software Source Code are correctly retrieved", content = @Content(mediaType = "application/json")),
+            @ApiResponse(responseCode = "400", description = "Bad request."),
+            @ApiResponse(responseCode = "401", description = "Token is missing or invalid"),
+            @ApiResponse(responseCode = "404", description = "Not found"),
+            @ApiResponse(responseCode = "415", description = "Wrong media type"),
+            @ApiResponse(responseCode = "500", description = "Error executing the request, the error may be, either in the gateway or the backoffice-service")
+    })
+    public ResponseEntity<?> getSoftwareSourceCode() {
+        User user = getUserFromSession();
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized: User not found in session.");
+        }
+
+        return ResponseEntity.status(HttpStatus.OK).body(MigrationExecution.getListOfObjects(user));
+    }
 }
