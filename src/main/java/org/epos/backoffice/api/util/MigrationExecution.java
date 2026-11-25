@@ -368,7 +368,7 @@ public class MigrationExecution {
                         parameter.setMultipleValues(multiple);
                         parameter.setExplode(multiple);
                         if(!mapping1.getDefaultValue().isBlank()) parameter.setDefaultValues(singletonOrEmpty(mapping1.getDefaultValue()));
-                        if(mapping1!=null && !mapping1.getParamValue().isEmpty()) parameter.setEnumValues(new ArrayList<>(safe(mapping1.getParamValue())));
+                        if(mapping1.getParamValue()!=null && !mapping1.getParamValue().isEmpty()) parameter.setEnumValues(new ArrayList<>(safe(mapping1.getParamValue())));
                         parameter.setLabel(mapping1.getLabel());
                         parameter.setName(mapping1.getVariable());
                         if(!mapping1.getValuePattern().isBlank()) parameter.setPattern(mapping1.getValuePattern());
@@ -478,7 +478,7 @@ public class MigrationExecution {
                         parameter.setMultipleValues(multiple);
                         parameter.setExplode(multiple);
                         if(!mapping1.getDefaultValue().isBlank()) parameter.setDefaultValues(singletonOrEmpty(mapping1.getDefaultValue()));
-                        if(mapping1!=null && !mapping1.getParamValue().isEmpty()) parameter.setEnumValues(new ArrayList<>(safe(mapping1.getParamValue())));
+                        if(mapping1.getParamValue()!=null && !mapping1.getParamValue().isEmpty()) parameter.setEnumValues(new ArrayList<>(safe(mapping1.getParamValue())));
                         parameter.setLabel(mapping1.getLabel());
                         parameter.setName(mapping1.getVariable());
                         if(!mapping1.getValuePattern().isBlank()) parameter.setPattern(mapping1.getValuePattern());
@@ -589,7 +589,7 @@ public class MigrationExecution {
                         parameter.setMultipleValues(multiple);
                         parameter.setExplode(multiple);
                         if(!mapping1.getDefaultValue().isBlank()) parameter.setDefaultValues(singletonOrEmpty(mapping1.getDefaultValue()));
-                        if(mapping1!=null && !mapping1.getParamValue().isEmpty()) parameter.setEnumValues(new ArrayList<>(safe(mapping1.getParamValue())));
+                        if(mapping1.getParamValue()!=null && !mapping1.getParamValue().isEmpty()) parameter.setEnumValues(new ArrayList<>(safe(mapping1.getParamValue())));
                         parameter.setLabel(mapping1.getLabel());
                         parameter.setName(mapping1.getVariable());
                         if(!mapping1.getValuePattern().isBlank()) parameter.setPattern(mapping1.getValuePattern());
@@ -699,7 +699,7 @@ public class MigrationExecution {
                         parameter.setMultipleValues(multiple);
                         parameter.setExplode(multiple);
                         if(!mapping1.getDefaultValue().isBlank()) parameter.setDefaultValues(singletonOrEmpty(mapping1.getDefaultValue()));
-                        if(mapping1!=null && !mapping1.getParamValue().isEmpty()) parameter.setEnumValues(new ArrayList<>(safe(mapping1.getParamValue())));
+                        if(mapping1.getParamValue()!=null && !mapping1.getParamValue().isEmpty()) parameter.setEnumValues(new ArrayList<>(safe(mapping1.getParamValue())));
                         parameter.setLabel(mapping1.getLabel());
                         parameter.setName(mapping1.getVariable());
                         if(!mapping1.getValuePattern().isBlank()) parameter.setPattern(mapping1.getValuePattern());
@@ -809,7 +809,7 @@ public class MigrationExecution {
                         parameter.setMultipleValues(multiple);
                         parameter.setExplode(multiple);
                         if(!mapping1.getDefaultValue().isBlank()) parameter.setDefaultValues(singletonOrEmpty(mapping1.getDefaultValue()));
-                        if(mapping1!=null && !mapping1.getParamValue().isEmpty()) parameter.setEnumValues(new ArrayList<>(safe(mapping1.getParamValue())));
+                        if(mapping1.getParamValue()!=null && !mapping1.getParamValue().isEmpty()) parameter.setEnumValues(new ArrayList<>(safe(mapping1.getParamValue())));
                         parameter.setLabel(mapping1.getLabel());
                         parameter.setName(mapping1.getVariable());
                         if(!mapping1.getValuePattern().isBlank()) parameter.setPattern(mapping1.getValuePattern());
