@@ -1,4 +1,4 @@
-FROM amazoncorretto:21-alpine
+FROM amazoncorretto:27-alpine
 
 LABEL org.opencontainers.image.source="https://github.com/your-org/your-repo" \
       org.opencontainers.image.description="Your app description" \
