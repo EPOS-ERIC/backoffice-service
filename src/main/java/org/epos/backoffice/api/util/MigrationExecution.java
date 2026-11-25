@@ -298,8 +298,8 @@ public class MigrationExecution {
             dynamicDatasetExport.setResourceType("dataset");
 
             DynamicDatasetExport.Metadata metadata = new DynamicDatasetExport.Metadata();
-            metadata.setAccessRight(dataProduct.getAccessRight());
-            metadata.setAccrualPeriodicity(dataProduct.getAccrualPeriodicity());
+            metadata.setAccessRight(AccessRightMapper.toEuCode(dataProduct.getAccessRight()));
+            metadata.setAccrualPeriodicity(FrequencyMapper.toEuCode(dataProduct.getAccrualPeriodicity()));
             metadata.setCategories(categories);
             metadata.setContactPoints(contactPoints);
             metadata.setCreated(str(dataProduct.getCreated().atOffset(ZoneOffset.UTC)
@@ -341,7 +341,7 @@ public class MigrationExecution {
                 else {
                     dd.setType("DOWNLOADABLE_FILE");
                     DynamicDatasetExport.DownloadableFile downloadableFile = new DynamicDatasetExport.DownloadableFile();
-                    downloadableFile.setFormat(distribution.getFormat());
+                    downloadableFile.setFormat(FileTypeMapper.toMimeType(distribution.getFormat()));
                     downloadableFile.setUrl(first(distribution.getDownloadURL()));
                     dd.setDownloadableFile(downloadableFile);
                 }
@@ -349,7 +349,7 @@ public class MigrationExecution {
                 if (rd.webService != null || rd.operation != null) {
                     DynamicDatasetExport.WebService webService1 = new DynamicDatasetExport.WebService();
                     webService1.setContactPoints(rd.webServiceContactEmails);
-                    webService1.setFormat(distribution.getFormat());
+                    webService1.setFormat(FileTypeMapper.toMimeType(distribution.getFormat()));
                     webService1.setProvider(rd.providerName);
                     webService1.setType("DYNAMIC");
                     webService1.setDocumentationUri(rd.documentationUri);
@@ -408,8 +408,8 @@ public class MigrationExecution {
             httpDatasetExport.setResourceType("dataset");
 
             HTTPDatasetExport.Metadata metadata = new HTTPDatasetExport.Metadata();
-            metadata.setAccessRight(dataProduct.getAccessRight());
-            metadata.setAccrualPeriodicity(dataProduct.getAccrualPeriodicity());
+            metadata.setAccessRight(AccessRightMapper.toEuCode(dataProduct.getAccessRight()));
+            metadata.setAccrualPeriodicity(FrequencyMapper.toEuCode(dataProduct.getAccrualPeriodicity()));
             metadata.setCategories(categories);
             metadata.setContactPoints(contactPoints);
             metadata.setCreated(str(dataProduct.getCreated().atOffset(ZoneOffset.UTC)
@@ -451,7 +451,7 @@ public class MigrationExecution {
                 else {
                     dd.setType("DOWNLOADABLE_FILE");
                     HTTPDatasetExport.DownloadableFile downloadableFile = new HTTPDatasetExport.DownloadableFile();
-                    downloadableFile.setFormat(distribution.getFormat());
+                    downloadableFile.setFormat(FileTypeMapper.toMimeType(distribution.getFormat()));
                     downloadableFile.setUrl(first(distribution.getDownloadURL()));
                     dd.setDownloadableFile(downloadableFile);
                 }
@@ -459,7 +459,7 @@ public class MigrationExecution {
                 if (rd.webService != null || rd.operation != null) {
                     HTTPDatasetExport.WebService webService1 = new HTTPDatasetExport.WebService();
                     webService1.setContactPoints(rd.webServiceContactEmails);
-                    webService1.setFormat(distribution.getFormat());
+                    webService1.setFormat(FileTypeMapper.toMimeType(distribution.getFormat()));
                     webService1.setProvider(rd.providerName);
                     webService1.setType("HTTP");
                     webService1.setDocumentationUri(rd.documentationUri);
@@ -518,8 +518,8 @@ public class MigrationExecution {
             wmsDatasetExport.setResourceType("dataset");
 
             WMSDatasetExport.Metadata metadata = new WMSDatasetExport.Metadata();
-            metadata.setAccessRight(dataProduct.getAccessRight());
-            metadata.setAccrualPeriodicity(dataProduct.getAccrualPeriodicity());
+            metadata.setAccessRight(AccessRightMapper.toEuCode(dataProduct.getAccessRight()));
+            metadata.setAccrualPeriodicity(FrequencyMapper.toEuCode(dataProduct.getAccrualPeriodicity()));
             metadata.setCategories(categories);
             metadata.setContactPoints(contactPoints);
             metadata.setCreated(str(dataProduct.getCreated().atOffset(ZoneOffset.UTC)
@@ -561,7 +561,7 @@ public class MigrationExecution {
                 else {
                     dd.setType("DOWNLOADABLE_FILE");
                     WMSDatasetExport.DownloadableFile downloadableFile = new WMSDatasetExport.DownloadableFile();
-                    downloadableFile.setFormat(distribution.getFormat());
+                    downloadableFile.setFormat(FileTypeMapper.toMimeType(distribution.getFormat()));
                     downloadableFile.setUrl(first(distribution.getDownloadURL()));
                     dd.setDownloadableFile(downloadableFile);
                 }
@@ -569,7 +569,7 @@ public class MigrationExecution {
                 if (rd.webService != null || rd.operation != null) {
                     WMSDatasetExport.WebService webService1 = new WMSDatasetExport.WebService();
                     webService1.setContactPoints(rd.webServiceContactEmails);
-                    webService1.setFormat(distribution.getFormat());
+                    webService1.setFormat(FileTypeMapper.toMimeType(distribution.getFormat()));
                     webService1.setProvider(rd.providerName);
                     webService1.setType("WMS");
                     webService1.setDocumentationUri(rd.documentationUri);
@@ -628,8 +628,8 @@ public class MigrationExecution {
             wmtsDatasetExport.setResourceType("dataset");
 
             WMTSDatasetExport.Metadata metadata = new WMTSDatasetExport.Metadata();
-            metadata.setAccessRight(dataProduct.getAccessRight());
-            metadata.setAccrualPeriodicity(dataProduct.getAccrualPeriodicity());
+            metadata.setAccessRight(AccessRightMapper.toEuCode(dataProduct.getAccessRight()));
+            metadata.setAccrualPeriodicity(FrequencyMapper.toEuCode(dataProduct.getAccrualPeriodicity()));
             metadata.setCategories(categories);
             metadata.setContactPoints(contactPoints);
             metadata.setCreated(str(dataProduct.getCreated().atOffset(ZoneOffset.UTC)
@@ -671,7 +671,7 @@ public class MigrationExecution {
                 else {
                     dd.setType("DOWNLOADABLE_FILE");
                     WMTSDatasetExport.DownloadableFile downloadableFile = new WMTSDatasetExport.DownloadableFile();
-                    downloadableFile.setFormat(distribution.getFormat());
+                    downloadableFile.setFormat(FileTypeMapper.toMimeType(distribution.getFormat()));
                     downloadableFile.setUrl(first(distribution.getDownloadURL()));
                     dd.setDownloadableFile(downloadableFile);
                 }
@@ -679,7 +679,7 @@ public class MigrationExecution {
                 if (rd.webService != null || rd.operation != null) {
                     WMTSDatasetExport.WebService webService1 = new WMTSDatasetExport.WebService();
                     webService1.setContactPoints(rd.webServiceContactEmails);
-                    webService1.setFormat(distribution.getFormat());
+                    webService1.setFormat(FileTypeMapper.toMimeType(distribution.getFormat()));
                     webService1.setProvider(rd.providerName);
                     webService1.setType("WMTS");
                     webService1.setDocumentationUri(rd.documentationUri);
@@ -739,8 +739,8 @@ public class MigrationExecution {
             wfsDatasetExport.setResourceType("dataset");
 
             WFSDatasetExport.Metadata metadata = new WFSDatasetExport.Metadata();
-            metadata.setAccessRight(dataProduct.getAccessRight());
-            metadata.setAccrualPeriodicity(dataProduct.getAccrualPeriodicity());
+            metadata.setAccessRight(AccessRightMapper.toEuCode(dataProduct.getAccessRight()));
+            metadata.setAccrualPeriodicity(FrequencyMapper.toEuCode(dataProduct.getAccrualPeriodicity()));
             metadata.setCategories(categories);
             metadata.setContactPoints(contactPoints);
             metadata.setCreated(str(dataProduct.getCreated().atOffset(ZoneOffset.UTC)
@@ -782,7 +782,7 @@ public class MigrationExecution {
                 else {
                     dd.setType("DOWNLOADABLE_FILE");
                     WFSDatasetExport.DownloadableFile downloadableFile = new WFSDatasetExport.DownloadableFile();
-                    downloadableFile.setFormat(distribution.getFormat());
+                    downloadableFile.setFormat(FileTypeMapper.toMimeType(distribution.getFormat()));
                     downloadableFile.setUrl(first(distribution.getDownloadURL()));
                     dd.setDownloadableFile(downloadableFile);
                 }
@@ -790,7 +790,7 @@ public class MigrationExecution {
                 if (rd.webService != null || rd.operation != null) {
                     WFSDatasetExport.WebService webService1 = new WFSDatasetExport.WebService();
                     webService1.setContactPoints(rd.webServiceContactEmails);
-                    webService1.setFormat(distribution.getFormat());
+                    webService1.setFormat(FileTypeMapper.toMimeType(distribution.getFormat()));
                     webService1.setProvider(rd.providerName);
                     webService1.setType("WFS"); // was "WMS" in the original code
                     webService1.setDocumentationUri(rd.documentationUri);
