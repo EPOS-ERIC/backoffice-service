@@ -9,6 +9,8 @@ import model.StatusType;
 import org.epos.backoffice.bean.*;
 import org.epos.eposdatamodel.*;
 
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -268,7 +270,7 @@ public class MigrationExecution {
         return list;
     }
 
-    public static JsonObject getDataset(String meta_id, String instance_id, User user) {
+    public static JsonObject getDataset(String instance_id, User user) {
 
         if (!isAdmin(user)) return null;
 
@@ -300,7 +302,8 @@ public class MigrationExecution {
             metadata.setAccrualPeriodicity(dataProduct.getAccrualPeriodicity());
             metadata.setCategories(categories);
             metadata.setContactPoints(contactPoints);
-            metadata.setCreated(str(dataProduct.getCreated()));
+            metadata.setCreated(str(dataProduct.getCreated().atOffset(ZoneOffset.UTC)
+                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'"))));
             metadata.setDescription(first(dataProduct.getDescription()));
             metadata.setKeywords(keywords);
             List<DynamicDatasetExport.PersistentIdentifier> listIdentifiers = new ArrayList<>();
@@ -315,13 +318,16 @@ public class MigrationExecution {
             metadata.setQualityAnnotation(dataProduct.getQualityAssurance());
             if (period != null) {
                 DynamicDatasetExport.TemporalCoverage gtc = new DynamicDatasetExport.TemporalCoverage();
-                gtc.setStart(str(period.getStartDate()));
-                gtc.setEnd(str(period.getEndDate()));
+                gtc.setStart(str(period.getStartDate().atOffset(ZoneOffset.UTC)
+                        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'"))));
+                gtc.setEnd(str(period.getEndDate().atOffset(ZoneOffset.UTC)
+                        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'"))));
                 metadata.setTemporalCoverage(gtc);
             }
             if (location != null) metadata.setSpatialCoverage(location.getLocation());
             metadata.setTitle(first(dataProduct.getTitle()));
-            metadata.setUpdated(str(dataProduct.getModified()));
+            metadata.setUpdated(str(dataProduct.getModified().atOffset(ZoneOffset.UTC)
+                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'"))));
 
             List<DynamicDatasetExport.Distribution> distributions = new ArrayList<>();
             for (ResolvedDistribution rd : resolvedDistributions) {
@@ -329,13 +335,16 @@ public class MigrationExecution {
                 DynamicDatasetExport.Distribution dd = new DynamicDatasetExport.Distribution();
                 dd.setByteSize(parseLong(str(distribution.getByteSize())));
                 dd.setDescription(first(distribution.getDescription()));
-                DynamicDatasetExport.DownloadableFile downloadableFile = new DynamicDatasetExport.DownloadableFile();
-                downloadableFile.setFormat(distribution.getFormat());
-                downloadableFile.setUrl(first(distribution.getDownloadURL()));
-                dd.setDownloadableFile(downloadableFile);
                 dd.setLicense(distribution.getLicence());
                 dd.setTitle(first(distribution.getTitle()));
-                dd.setType(distribution.getType());
+                if(distribution.getType().contains("WEB_SERVICE")) dd.setType("WEB_SERVICE");
+                else {
+                    dd.setType("DOWNLOADABLE_FILE");
+                    DynamicDatasetExport.DownloadableFile downloadableFile = new DynamicDatasetExport.DownloadableFile();
+                    downloadableFile.setFormat(distribution.getFormat());
+                    downloadableFile.setUrl(first(distribution.getDownloadURL()));
+                    dd.setDownloadableFile(downloadableFile);
+                }
 
                 if (rd.webService != null || rd.operation != null) {
                     DynamicDatasetExport.WebService webService1 = new DynamicDatasetExport.WebService();
@@ -344,9 +353,10 @@ public class MigrationExecution {
                     webService1.setProvider(rd.providerName);
                     webService1.setType("DYNAMIC");
                     webService1.setDocumentationUri(rd.documentationUri);
+                    String[] templateSplit = rd.operation.getTemplate().split("\\{?");
                     if (rd.operation != null) {
                         webService1.setMethod(rd.operation.getMethod());
-                        webService1.setTemplateUrl(rd.operation.getTemplate());
+                        webService1.setTemplateUrl(templateSplit[0]);
                     }
                     if (rd.visibleOn != null) webService1.setVisibleOn(rd.visibleOn);
 
@@ -356,16 +366,29 @@ public class MigrationExecution {
                         DynamicDatasetExport.Parameter parameter = new DynamicDatasetExport.Parameter();
                         boolean multiple = bool(mapping1.getMultipleValues());
                         parameter.setMultipleValues(multiple);
-                        if (multiple) parameter.setExplode(true);
-                        parameter.setDefaultValues(singletonOrEmpty(mapping1.getDefaultValue()));
-                        parameter.setEnumValues(new ArrayList<>(safe(mapping1.getParamValue())));
+                        parameter.setExplode(multiple);
+                        if(!mapping1.getDefaultValue().isBlank()) parameter.setDefaultValues(singletonOrEmpty(mapping1.getDefaultValue()));
+                        if(!mapping1.getParamValue().isEmpty()) parameter.setEnumValues(new ArrayList<>(safe(mapping1.getParamValue())));
                         parameter.setLabel(mapping1.getLabel());
                         parameter.setName(mapping1.getVariable());
-                        parameter.setPattern(mapping1.getValuePattern());
+                        if(!mapping1.getValuePattern().isBlank()) parameter.setPattern(mapping1.getValuePattern());
                         parameter.setPosition(position);
-                        parameter.setProperty(mapping1.getProperty());
+                        if(!mapping1.getProperty().isBlank()) {
+                            parameter.setProperty(mapping1.getProperty());
+                            if(mapping1.getProperty().contains("encodingFormat")) parameter.setRole("FORMAT");
+                            if(mapping1.getProperty().contains("startDate")) parameter.setRole("START_DATE");
+                            if(mapping1.getProperty().contains("endDate")) parameter.setRole("END_DATE");
+                            if(mapping1.getProperty().contains("west")) parameter.setRole("MIN_LON");
+                            if(mapping1.getProperty().contains("east")) parameter.setRole("MAX_LON");
+                            if(mapping1.getProperty().contains("south")) parameter.setRole("MIN_LAT");
+                            if(mapping1.getProperty().contains("north")) parameter.setRole("MAX_LAT");
+                        }
                         parameter.setRequired(bool(mapping1.getRequired()));
                         parameter.setReadOnly(bool(mapping1.getReadOnlyValue()));
+                        if(templateSplit[0].contains(mapping1.getVariable()))
+                            parameter.setLocation("PATH");
+                        else parameter.setLocation("QUERY");
+                        parameter.setKind("STRING");
                         parameters.add(parameter);
                         position++;
                     }
@@ -389,7 +412,8 @@ public class MigrationExecution {
             metadata.setAccrualPeriodicity(dataProduct.getAccrualPeriodicity());
             metadata.setCategories(categories);
             metadata.setContactPoints(contactPoints);
-            metadata.setCreated(str(dataProduct.getCreated()));
+            metadata.setCreated(str(dataProduct.getCreated().atOffset(ZoneOffset.UTC)
+                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'"))));
             metadata.setDescription(first(dataProduct.getDescription()));
             metadata.setKeywords(keywords);
             List<HTTPDatasetExport.PersistentIdentifier> listIdentifiers = new ArrayList<>();
@@ -404,13 +428,16 @@ public class MigrationExecution {
             metadata.setQualityAnnotation(dataProduct.getQualityAssurance());
             if (period != null) {
                 HTTPDatasetExport.TemporalCoverage gtc = new HTTPDatasetExport.TemporalCoverage();
-                gtc.setStart(str(period.getStartDate()));
-                gtc.setEnd(str(period.getEndDate()));
+                gtc.setStart(str(period.getStartDate().atOffset(ZoneOffset.UTC)
+                        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'"))));
+                gtc.setEnd(str(period.getEndDate().atOffset(ZoneOffset.UTC)
+                        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'"))));
                 metadata.setTemporalCoverage(gtc);
             }
             if (location != null) metadata.setSpatialCoverage(location.getLocation());
             metadata.setTitle(first(dataProduct.getTitle()));
-            metadata.setUpdated(str(dataProduct.getModified()));
+            metadata.setUpdated(str(dataProduct.getModified().atOffset(ZoneOffset.UTC)
+                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'"))));
 
             List<HTTPDatasetExport.Distribution> distributions = new ArrayList<>();
             for (ResolvedDistribution rd : resolvedDistributions) {
@@ -418,13 +445,16 @@ public class MigrationExecution {
                 HTTPDatasetExport.Distribution dd = new HTTPDatasetExport.Distribution();
                 dd.setByteSize(parseLong(str(distribution.getByteSize())));
                 dd.setDescription(first(distribution.getDescription()));
-                HTTPDatasetExport.DownloadableFile downloadableFile = new HTTPDatasetExport.DownloadableFile();
-                downloadableFile.setFormat(distribution.getFormat());
-                downloadableFile.setUrl(first(distribution.getDownloadURL()));
-                dd.setDownloadableFile(downloadableFile);
                 dd.setLicense(distribution.getLicence());
                 dd.setTitle(first(distribution.getTitle()));
-                dd.setType(distribution.getType());
+                if(distribution.getType().contains("WEB_SERVICE")) dd.setType("WEB_SERVICE");
+                else {
+                    dd.setType("DOWNLOADABLE_FILE");
+                    HTTPDatasetExport.DownloadableFile downloadableFile = new HTTPDatasetExport.DownloadableFile();
+                    downloadableFile.setFormat(distribution.getFormat());
+                    downloadableFile.setUrl(first(distribution.getDownloadURL()));
+                    dd.setDownloadableFile(downloadableFile);
+                }
 
                 if (rd.webService != null || rd.operation != null) {
                     HTTPDatasetExport.WebService webService1 = new HTTPDatasetExport.WebService();
@@ -433,9 +463,10 @@ public class MigrationExecution {
                     webService1.setProvider(rd.providerName);
                     webService1.setType("HTTP");
                     webService1.setDocumentationUri(rd.documentationUri);
+                    String[] templateSplit = rd.operation.getTemplate().split("\\{?");
                     if (rd.operation != null) {
                         webService1.setMethod(rd.operation.getMethod());
-                        webService1.setTemplateUrl(rd.operation.getTemplate());
+                        webService1.setTemplateUrl(templateSplit[0]);
                     }
                     if (rd.visibleOn != null) webService1.setVisibleOn(rd.visibleOn);
 
@@ -445,16 +476,29 @@ public class MigrationExecution {
                         HTTPDatasetExport.Parameter parameter = new HTTPDatasetExport.Parameter();
                         boolean multiple = bool(mapping1.getMultipleValues());
                         parameter.setMultipleValues(multiple);
-                        if (multiple) parameter.setExplode(true);
-                        parameter.setDefaultValues(singletonOrEmpty(mapping1.getDefaultValue()));
-                        parameter.setEnumValues(new ArrayList<>(safe(mapping1.getParamValue())));
+                        parameter.setExplode(multiple);
+                        if(!mapping1.getDefaultValue().isBlank()) parameter.setDefaultValues(singletonOrEmpty(mapping1.getDefaultValue()));
+                        if(!mapping1.getParamValue().isEmpty()) parameter.setEnumValues(new ArrayList<>(safe(mapping1.getParamValue())));
                         parameter.setLabel(mapping1.getLabel());
                         parameter.setName(mapping1.getVariable());
-                        parameter.setPattern(mapping1.getValuePattern());
+                        if(!mapping1.getValuePattern().isBlank()) parameter.setPattern(mapping1.getValuePattern());
                         parameter.setPosition(position);
-                        parameter.setProperty(mapping1.getProperty());
+                        if(!mapping1.getProperty().isBlank()) {
+                            parameter.setProperty(mapping1.getProperty());
+                            if(mapping1.getProperty().contains("encodingFormat")) parameter.setRole("FORMAT");
+                            if(mapping1.getProperty().contains("startDate")) parameter.setRole("START_DATE");
+                            if(mapping1.getProperty().contains("endDate")) parameter.setRole("END_DATE");
+                            if(mapping1.getProperty().contains("west")) parameter.setRole("MIN_LON");
+                            if(mapping1.getProperty().contains("east")) parameter.setRole("MAX_LON");
+                            if(mapping1.getProperty().contains("south")) parameter.setRole("MIN_LAT");
+                            if(mapping1.getProperty().contains("north")) parameter.setRole("MAX_LAT");
+                        }
                         parameter.setRequired(bool(mapping1.getRequired()));
                         parameter.setReadOnly(bool(mapping1.getReadOnlyValue()));
+                        if(templateSplit[0].contains(mapping1.getVariable()))
+                            parameter.setLocation("PATH");
+                        else parameter.setLocation("QUERY");
+                        parameter.setKind("STRING");
                         parameters.add(parameter);
                         position++;
                     }
@@ -478,7 +522,8 @@ public class MigrationExecution {
             metadata.setAccrualPeriodicity(dataProduct.getAccrualPeriodicity());
             metadata.setCategories(categories);
             metadata.setContactPoints(contactPoints);
-            metadata.setCreated(str(dataProduct.getCreated()));
+            metadata.setCreated(str(dataProduct.getCreated().atOffset(ZoneOffset.UTC)
+                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'"))));
             metadata.setDescription(first(dataProduct.getDescription()));
             metadata.setKeywords(keywords);
             List<WMSDatasetExport.PersistentIdentifier> listIdentifiers = new ArrayList<>();
@@ -493,13 +538,16 @@ public class MigrationExecution {
             metadata.setQualityAnnotation(dataProduct.getQualityAssurance());
             if (period != null) {
                 WMSDatasetExport.TemporalCoverage gtc = new WMSDatasetExport.TemporalCoverage();
-                gtc.setStart(str(period.getStartDate()));
-                gtc.setEnd(str(period.getEndDate()));
+                gtc.setStart(str(period.getStartDate().atOffset(ZoneOffset.UTC)
+                        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'"))));
+                gtc.setEnd(str(period.getEndDate().atOffset(ZoneOffset.UTC)
+                        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'"))));
                 metadata.setTemporalCoverage(gtc);
             }
             if (location != null) metadata.setSpatialCoverage(location.getLocation());
             metadata.setTitle(first(dataProduct.getTitle()));
-            metadata.setUpdated(str(dataProduct.getModified()));
+            metadata.setUpdated(str(dataProduct.getModified().atOffset(ZoneOffset.UTC)
+                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'"))));
 
             List<WMSDatasetExport.Distribution> distributions = new ArrayList<>();
             for (ResolvedDistribution rd : resolvedDistributions) {
@@ -507,13 +555,16 @@ public class MigrationExecution {
                 WMSDatasetExport.Distribution dd = new WMSDatasetExport.Distribution();
                 dd.setByteSize(parseLong(str(distribution.getByteSize())));
                 dd.setDescription(first(distribution.getDescription()));
-                WMSDatasetExport.DownloadableFile downloadableFile = new WMSDatasetExport.DownloadableFile();
-                downloadableFile.setFormat(distribution.getFormat());
-                downloadableFile.setUrl(first(distribution.getDownloadURL()));
-                dd.setDownloadableFile(downloadableFile);
                 dd.setLicense(distribution.getLicence());
                 dd.setTitle(first(distribution.getTitle()));
-                dd.setType(distribution.getType());
+                if(distribution.getType().contains("WEB_SERVICE")) dd.setType("WEB_SERVICE");
+                else {
+                    dd.setType("DOWNLOADABLE_FILE");
+                    WMSDatasetExport.DownloadableFile downloadableFile = new WMSDatasetExport.DownloadableFile();
+                    downloadableFile.setFormat(distribution.getFormat());
+                    downloadableFile.setUrl(first(distribution.getDownloadURL()));
+                    dd.setDownloadableFile(downloadableFile);
+                }
 
                 if (rd.webService != null || rd.operation != null) {
                     WMSDatasetExport.WebService webService1 = new WMSDatasetExport.WebService();
@@ -522,10 +573,11 @@ public class MigrationExecution {
                     webService1.setProvider(rd.providerName);
                     webService1.setType("WMS");
                     webService1.setDocumentationUri(rd.documentationUri);
+                    String[] templateSplit = rd.operation.getTemplate().split("\\{?");
                     if (rd.operation != null) {
                         webService1.setCapabilitiesUrl(rd.operation.getTemplate());
                         webService1.setMethod(rd.operation.getMethod());
-                        webService1.setTemplateUrl(rd.operation.getTemplate());
+                        webService1.setTemplateUrl(templateSplit[0]);
                     }
                     if (rd.visibleOn != null) webService1.setVisibleOn(rd.visibleOn);
 
@@ -535,18 +587,30 @@ public class MigrationExecution {
                         WMSDatasetExport.Parameter parameter = new WMSDatasetExport.Parameter();
                         boolean multiple = bool(mapping1.getMultipleValues());
                         parameter.setMultipleValues(multiple);
-                        if (multiple) parameter.setExplode(true);
-                        parameter.setDefaultValues(singletonOrEmpty(mapping1.getDefaultValue()));
-                        parameter.setEnumValues(new ArrayList<>(safe(mapping1.getParamValue())));
+                        parameter.setExplode(multiple);
+                        if(!mapping1.getDefaultValue().isBlank()) parameter.setDefaultValues(singletonOrEmpty(mapping1.getDefaultValue()));
+                        if(!mapping1.getParamValue().isEmpty()) parameter.setEnumValues(new ArrayList<>(safe(mapping1.getParamValue())));
                         parameter.setLabel(mapping1.getLabel());
                         parameter.setName(mapping1.getVariable());
-                        parameter.setPattern(mapping1.getValuePattern());
+                        if(!mapping1.getValuePattern().isBlank()) parameter.setPattern(mapping1.getValuePattern());
                         parameter.setPosition(position);
-                        parameter.setProperty(mapping1.getProperty());
+                        if(!mapping1.getProperty().isBlank()) {
+                            parameter.setProperty(mapping1.getProperty());
+                            if(mapping1.getProperty().contains("encodingFormat")) parameter.setRole("FORMAT");
+                            if(mapping1.getProperty().contains("startDate")) parameter.setRole("START_DATE");
+                            if(mapping1.getProperty().contains("endDate")) parameter.setRole("END_DATE");
+                            if(mapping1.getProperty().contains("west")) parameter.setRole("MIN_LON");
+                            if(mapping1.getProperty().contains("east")) parameter.setRole("MAX_LON");
+                            if(mapping1.getProperty().contains("south")) parameter.setRole("MIN_LAT");
+                            if(mapping1.getProperty().contains("north")) parameter.setRole("MAX_LAT");
+                        }
                         parameter.setRequired(bool(mapping1.getRequired()));
                         parameter.setReadOnly(bool(mapping1.getReadOnlyValue()));
+                        if(templateSplit[0].contains(mapping1.getVariable()))
+                            parameter.setLocation("PATH");
+                        else parameter.setLocation("QUERY");
+                        parameter.setKind("STRING");
                         mapParameters.add(parameter);
-                        position++;
                     }
                     webService1.setGetMapParameters(mapParameters);
                     dd.setWebService(webService1);
@@ -568,7 +632,8 @@ public class MigrationExecution {
             metadata.setAccrualPeriodicity(dataProduct.getAccrualPeriodicity());
             metadata.setCategories(categories);
             metadata.setContactPoints(contactPoints);
-            metadata.setCreated(str(dataProduct.getCreated()));
+            metadata.setCreated(str(dataProduct.getCreated().atOffset(ZoneOffset.UTC)
+                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'"))));
             metadata.setDescription(first(dataProduct.getDescription()));
             metadata.setKeywords(keywords);
             List<WMTSDatasetExport.PersistentIdentifier> listIdentifiers = new ArrayList<>();
@@ -583,13 +648,16 @@ public class MigrationExecution {
             metadata.setQualityAnnotation(dataProduct.getQualityAssurance());
             if (period != null) {
                 WMTSDatasetExport.TemporalCoverage gtc = new WMTSDatasetExport.TemporalCoverage();
-                gtc.setStart(str(period.getStartDate()));
-                gtc.setEnd(str(period.getEndDate()));
+                gtc.setStart(str(period.getStartDate().atOffset(ZoneOffset.UTC)
+                        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'"))));
+                gtc.setEnd(str(period.getEndDate().atOffset(ZoneOffset.UTC)
+                        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'"))));
                 metadata.setTemporalCoverage(gtc);
             }
             if (location != null) metadata.setSpatialCoverage(location.getLocation());
             metadata.setTitle(first(dataProduct.getTitle()));
-            metadata.setUpdated(str(dataProduct.getModified()));
+            metadata.setUpdated(str(dataProduct.getModified().atOffset(ZoneOffset.UTC)
+                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'"))));
 
             List<WMTSDatasetExport.Distribution> distributions = new ArrayList<>();
             for (ResolvedDistribution rd : resolvedDistributions) {
@@ -597,13 +665,16 @@ public class MigrationExecution {
                 WMTSDatasetExport.Distribution dd = new WMTSDatasetExport.Distribution();
                 dd.setByteSize(parseLong(str(distribution.getByteSize())));
                 dd.setDescription(first(distribution.getDescription()));
-                WMTSDatasetExport.DownloadableFile downloadableFile = new WMTSDatasetExport.DownloadableFile();
-                downloadableFile.setFormat(distribution.getFormat());
-                downloadableFile.setUrl(first(distribution.getDownloadURL()));
-                dd.setDownloadableFile(downloadableFile);
                 dd.setLicense(distribution.getLicence());
                 dd.setTitle(first(distribution.getTitle()));
-                dd.setType(distribution.getType());
+                if(distribution.getType().contains("WEB_SERVICE")) dd.setType("WEB_SERVICE");
+                else {
+                    dd.setType("DOWNLOADABLE_FILE");
+                    WMTSDatasetExport.DownloadableFile downloadableFile = new WMTSDatasetExport.DownloadableFile();
+                    downloadableFile.setFormat(distribution.getFormat());
+                    downloadableFile.setUrl(first(distribution.getDownloadURL()));
+                    dd.setDownloadableFile(downloadableFile);
+                }
 
                 if (rd.webService != null || rd.operation != null) {
                     WMTSDatasetExport.WebService webService1 = new WMTSDatasetExport.WebService();
@@ -612,10 +683,11 @@ public class MigrationExecution {
                     webService1.setProvider(rd.providerName);
                     webService1.setType("WMTS");
                     webService1.setDocumentationUri(rd.documentationUri);
+                    String[] templateSplit = rd.operation.getTemplate().split("\\{?");
                     if (rd.operation != null) {
                         webService1.setCapabilitiesUrl(rd.operation.getTemplate());
                         webService1.setMethod(rd.operation.getMethod());
-                        webService1.setTemplateUrl(rd.operation.getTemplate());
+                        webService1.setTemplateUrl(templateSplit[0]);
                     }
                     if (rd.visibleOn != null) webService1.setVisibleOn(rd.visibleOn);
 
@@ -625,16 +697,29 @@ public class MigrationExecution {
                         WMTSDatasetExport.Parameter parameter = new WMTSDatasetExport.Parameter();
                         boolean multiple = bool(mapping1.getMultipleValues());
                         parameter.setMultipleValues(multiple);
-                        if (multiple) parameter.setExplode(true);
-                        parameter.setDefaultValues(singletonOrEmpty(mapping1.getDefaultValue()));
-                        parameter.setEnumValues(new ArrayList<>(safe(mapping1.getParamValue())));
+                        parameter.setExplode(multiple);
+                        if(!mapping1.getDefaultValue().isBlank()) parameter.setDefaultValues(singletonOrEmpty(mapping1.getDefaultValue()));
+                        if(!mapping1.getParamValue().isEmpty()) parameter.setEnumValues(new ArrayList<>(safe(mapping1.getParamValue())));
                         parameter.setLabel(mapping1.getLabel());
                         parameter.setName(mapping1.getVariable());
-                        parameter.setPattern(mapping1.getValuePattern());
+                        if(!mapping1.getValuePattern().isBlank()) parameter.setPattern(mapping1.getValuePattern());
                         parameter.setPosition(position);
-                        parameter.setProperty(mapping1.getProperty());
+                        if(!mapping1.getProperty().isBlank()) {
+                            parameter.setProperty(mapping1.getProperty());
+                            if(mapping1.getProperty().contains("encodingFormat")) parameter.setRole("FORMAT");
+                            if(mapping1.getProperty().contains("startDate")) parameter.setRole("START_DATE");
+                            if(mapping1.getProperty().contains("endDate")) parameter.setRole("END_DATE");
+                            if(mapping1.getProperty().contains("west")) parameter.setRole("MIN_LON");
+                            if(mapping1.getProperty().contains("east")) parameter.setRole("MAX_LON");
+                            if(mapping1.getProperty().contains("south")) parameter.setRole("MIN_LAT");
+                            if(mapping1.getProperty().contains("north")) parameter.setRole("MAX_LAT");
+                        }
                         parameter.setRequired(bool(mapping1.getRequired()));
                         parameter.setReadOnly(bool(mapping1.getReadOnlyValue()));
+                        if(templateSplit[0].contains(mapping1.getVariable()))
+                            parameter.setLocation("PATH");
+                        else parameter.setLocation("QUERY");
+                        parameter.setKind("STRING");
                         mapParameters.add(parameter);
                         position++;
                     }
@@ -658,7 +743,8 @@ public class MigrationExecution {
             metadata.setAccrualPeriodicity(dataProduct.getAccrualPeriodicity());
             metadata.setCategories(categories);
             metadata.setContactPoints(contactPoints);
-            metadata.setCreated(str(dataProduct.getCreated()));
+            metadata.setCreated(str(dataProduct.getCreated().atOffset(ZoneOffset.UTC)
+                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'"))));
             metadata.setDescription(first(dataProduct.getDescription()));
             metadata.setKeywords(keywords);
             List<WFSDatasetExport.PersistentIdentifier> listIdentifiers = new ArrayList<>();
@@ -673,13 +759,16 @@ public class MigrationExecution {
             metadata.setQualityAnnotation(dataProduct.getQualityAssurance());
             if (period != null) {
                 WFSDatasetExport.TemporalCoverage gtc = new WFSDatasetExport.TemporalCoverage();
-                gtc.setStart(str(period.getStartDate()));
-                gtc.setEnd(str(period.getEndDate()));
+                gtc.setStart(str(period.getStartDate().atOffset(ZoneOffset.UTC)
+                        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'"))));
+                gtc.setEnd(str(period.getEndDate().atOffset(ZoneOffset.UTC)
+                        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'"))));
                 metadata.setTemporalCoverage(gtc);
             }
             if (location != null) metadata.setSpatialCoverage(location.getLocation());
             metadata.setTitle(first(dataProduct.getTitle()));
-            metadata.setUpdated(str(dataProduct.getModified()));
+            metadata.setUpdated(str(dataProduct.getModified().atOffset(ZoneOffset.UTC)
+                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'"))));
 
             List<WFSDatasetExport.Distribution> distributions = new ArrayList<>();
             for (ResolvedDistribution rd : resolvedDistributions) {
@@ -687,13 +776,16 @@ public class MigrationExecution {
                 WFSDatasetExport.Distribution dd = new WFSDatasetExport.Distribution();
                 dd.setByteSize(parseLong(str(distribution.getByteSize())));
                 dd.setDescription(first(distribution.getDescription()));
-                WFSDatasetExport.DownloadableFile downloadableFile = new WFSDatasetExport.DownloadableFile();
-                downloadableFile.setFormat(distribution.getFormat());
-                downloadableFile.setUrl(first(distribution.getDownloadURL()));
-                dd.setDownloadableFile(downloadableFile);
                 dd.setLicense(distribution.getLicence());
                 dd.setTitle(first(distribution.getTitle()));
-                dd.setType(distribution.getType());
+                if(distribution.getType().contains("WEB_SERVICE")) dd.setType("WEB_SERVICE");
+                else {
+                    dd.setType("DOWNLOADABLE_FILE");
+                    WFSDatasetExport.DownloadableFile downloadableFile = new WFSDatasetExport.DownloadableFile();
+                    downloadableFile.setFormat(distribution.getFormat());
+                    downloadableFile.setUrl(first(distribution.getDownloadURL()));
+                    dd.setDownloadableFile(downloadableFile);
+                }
 
                 if (rd.webService != null || rd.operation != null) {
                     WFSDatasetExport.WebService webService1 = new WFSDatasetExport.WebService();
@@ -702,9 +794,10 @@ public class MigrationExecution {
                     webService1.setProvider(rd.providerName);
                     webService1.setType("WFS"); // was "WMS" in the original code
                     webService1.setDocumentationUri(rd.documentationUri);
+                    String[] templateSplit = rd.operation.getTemplate().split("\\{?");
                     if (rd.operation != null) {
                         webService1.setMethod(rd.operation.getMethod());
-                        webService1.setTemplateUrl(rd.operation.getTemplate());
+                        webService1.setTemplateUrl(templateSplit[0]);
                     }
                     if (rd.visibleOn != null) webService1.setVisibleOn(rd.visibleOn);
 
@@ -714,16 +807,29 @@ public class MigrationExecution {
                         WFSDatasetExport.Parameter parameter = new WFSDatasetExport.Parameter();
                         boolean multiple = bool(mapping1.getMultipleValues());
                         parameter.setMultipleValues(multiple);
-                        if (multiple) parameter.setExplode(true);
-                        parameter.setDefaultValues(singletonOrEmpty(mapping1.getDefaultValue()));
-                        parameter.setEnumValues(new ArrayList<>(safe(mapping1.getParamValue())));
+                        parameter.setExplode(multiple);
+                        if(!mapping1.getDefaultValue().isBlank()) parameter.setDefaultValues(singletonOrEmpty(mapping1.getDefaultValue()));
+                        if(!mapping1.getParamValue().isEmpty()) parameter.setEnumValues(new ArrayList<>(safe(mapping1.getParamValue())));
                         parameter.setLabel(mapping1.getLabel());
                         parameter.setName(mapping1.getVariable());
-                        parameter.setPattern(mapping1.getValuePattern());
+                        if(!mapping1.getValuePattern().isBlank()) parameter.setPattern(mapping1.getValuePattern());
                         parameter.setPosition(position);
-                        parameter.setProperty(mapping1.getProperty());
+                        if(!mapping1.getProperty().isBlank()) {
+                            parameter.setProperty(mapping1.getProperty());
+                            if(mapping1.getProperty().contains("encodingFormat")) parameter.setRole("FORMAT");
+                            if(mapping1.getProperty().contains("startDate")) parameter.setRole("START_DATE");
+                            if(mapping1.getProperty().contains("endDate")) parameter.setRole("END_DATE");
+                            if(mapping1.getProperty().contains("west")) parameter.setRole("MIN_LON");
+                            if(mapping1.getProperty().contains("east")) parameter.setRole("MAX_LON");
+                            if(mapping1.getProperty().contains("south")) parameter.setRole("MIN_LAT");
+                            if(mapping1.getProperty().contains("north")) parameter.setRole("MAX_LAT");
+                        }
                         parameter.setRequired(bool(mapping1.getRequired()));
                         parameter.setReadOnly(bool(mapping1.getReadOnlyValue()));
+                        if(templateSplit[0].contains(mapping1.getVariable()))
+                            parameter.setLocation("PATH");
+                        else parameter.setLocation("QUERY");
+                        parameter.setKind("STRING");
                         mapParameters.add(parameter);
                         position++;
                     }
@@ -741,7 +847,7 @@ public class MigrationExecution {
         return item;
     }
 
-    public static JsonObject getSoftwareApplication(String meta_id, String instance_id, User user) {
+    public static JsonObject getSoftwareApplication(String instance_id, User user) {
 
         if (!isAdmin(user)) return null;
 
@@ -753,7 +859,7 @@ public class MigrationExecution {
         if (softwareApplication == null) return item;
 
         SoftwareApplicationExport softwareApplicationExport = new SoftwareApplicationExport();
-        softwareApplicationExport.setResourceType("softwareapplication");
+        softwareApplicationExport.setResourceType("software-application");
 
         SoftwareApplicationExport.Metadata metadata = new SoftwareApplicationExport.Metadata();
         // TODO: categories and creators are read from getContactPoint(): getCategory()
@@ -786,7 +892,7 @@ public class MigrationExecution {
         return item;
     }
 
-    public static JsonObject getSoftwareSourceCode(String meta_id, String instance_id, User user) {
+    public static JsonObject getSoftwareSourceCode(String instance_id, User user) {
 
         if (!isAdmin(user)) return null;
 
@@ -798,7 +904,7 @@ public class MigrationExecution {
         if (softwareSourceCode == null) return item;
 
         SoftwareSourceCodeExport softwareSourceCodeExport = new SoftwareSourceCodeExport();
-        softwareSourceCodeExport.setResourceType("softwaresourcecode");
+        softwareSourceCodeExport.setResourceType("software-source-code");
 
         SoftwareSourceCodeExport.Metadata metadata = new SoftwareSourceCodeExport.Metadata();
         // TODO: same as above, categories and creators are read from getContactPoint().

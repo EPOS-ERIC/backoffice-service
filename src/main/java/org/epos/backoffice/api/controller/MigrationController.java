@@ -104,7 +104,7 @@ public class MigrationController implements ApiDocTag{
     }
 
     @RequestMapping(
-            value = "/dataset/{meta_id}/{instance_id}",
+            value = "/dataset/{instance_id}",
             produces = {"application/json"},
             method = RequestMethod.GET)
     @ResponseBody
@@ -119,18 +119,17 @@ public class MigrationController implements ApiDocTag{
             @ApiResponse(responseCode = "500", description = "Error executing the request, the error may be, either in the gateway or the backoffice-service")
     })
     public ResponseEntity<String> getDataset(
-            @PathVariable String meta_id,
             @PathVariable String instance_id) {
         User user = getUserFromSession();
         if (user == null) {
             return jsonError(HttpStatus.UNAUTHORIZED, "Unauthorized: User not found in session.");
         }
 
-        return toJsonResponse(MigrationExecution.getDataset(meta_id, instance_id, user));
+        return toJsonResponse(MigrationExecution.getDataset(instance_id, user));
     }
 
     @RequestMapping(
-            value = "/softwareapplication/{meta_id}/{instance_id}",
+            value = "/softwareapplication/{instance_id}",
             produces = {"application/json"},
             method = RequestMethod.GET)
     @ResponseBody
@@ -145,18 +144,17 @@ public class MigrationController implements ApiDocTag{
             @ApiResponse(responseCode = "500", description = "Error executing the request, the error may be, either in the gateway or the backoffice-service")
     })
     public ResponseEntity<String> getSoftwareApplication(
-            @PathVariable String meta_id,
             @PathVariable String instance_id) {
         User user = getUserFromSession();
         if (user == null) {
             return jsonError(HttpStatus.UNAUTHORIZED, "Unauthorized: User not found in session.");
         }
 
-        return toJsonResponse(MigrationExecution.getSoftwareApplication(meta_id, instance_id, user));
+        return toJsonResponse(MigrationExecution.getSoftwareApplication(instance_id, user));
     }
 
     @RequestMapping(
-            value = "/softwaresourcecode/{meta_id}/{instance_id}",
+            value = "/softwaresourcecode/{instance_id}",
             produces = {"application/json"},
             method = RequestMethod.GET)
     @ResponseBody
@@ -171,13 +169,12 @@ public class MigrationController implements ApiDocTag{
             @ApiResponse(responseCode = "500", description = "Error executing the request, the error may be, either in the gateway or the backoffice-service")
     })
     public ResponseEntity<String> getSoftwareSourceCode(
-            @PathVariable String meta_id,
             @PathVariable String instance_id) {
         User user = getUserFromSession();
         if (user == null) {
             return jsonError(HttpStatus.UNAUTHORIZED, "Unauthorized: User not found in session.");
         }
 
-        return toJsonResponse(MigrationExecution.getSoftwareSourceCode(meta_id, instance_id, user));
+        return toJsonResponse(MigrationExecution.getSoftwareSourceCode(instance_id, user));
     }
 }
