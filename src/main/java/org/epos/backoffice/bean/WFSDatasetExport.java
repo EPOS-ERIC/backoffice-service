@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.gson.annotations.SerializedName;
 
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -49,7 +48,7 @@ public class WFSDatasetExport implements Serializable {
 
         @JsonProperty("keywords")
         @SerializedName("keywords")
-        private List<String> keywords = new ArrayList<>();
+        private List<String> keywords;
 
         /** Es. "TRIENNIAL" */
         @JsonProperty("accrual_periodicity")
@@ -67,7 +66,7 @@ public class WFSDatasetExport implements Serializable {
 
         @JsonProperty("distributions")
         @SerializedName("distributions")
-        private List<Distribution> distributions = new ArrayList<>();
+        private List<Distribution> distributions;
 
         /** Geometria in formato WKT, es. "POINT (12.5 41.9)" */
         @JsonProperty("spatial_coverage")
@@ -84,19 +83,19 @@ public class WFSDatasetExport implements Serializable {
 
         @JsonProperty("persistent_identifiers")
         @SerializedName("persistent_identifiers")
-        private List<PersistentIdentifier> persistentIdentifiers = new ArrayList<>();
+        private List<PersistentIdentifier> persistentIdentifiers;
 
         @JsonProperty("contact_points")
         @SerializedName("contact_points")
-        private List<String> contactPoints = new ArrayList<>();
+        private List<String> contactPoints;
 
         @JsonProperty("providers")
         @SerializedName("providers")
-        private List<String> providers = new ArrayList<>();
+        private List<String> providers;
 
         @JsonProperty("categories")
         @SerializedName("categories")
-        private List<String> categories = new ArrayList<>();
+        private List<String> categories;
 
         @JsonProperty("created")
         @SerializedName("created")
@@ -242,7 +241,7 @@ public class WFSDatasetExport implements Serializable {
         /** Es. ["GRAPH"] */
         @JsonProperty("visible_on")
         @SerializedName("visible_on")
-        private List<String> visibleOn = new ArrayList<>();
+        private List<String> visibleOn;
 
         @JsonProperty("provider")
         @SerializedName("provider")
@@ -254,7 +253,7 @@ public class WFSDatasetExport implements Serializable {
 
         @JsonProperty("contact_points")
         @SerializedName("contact_points")
-        private List<String> contactPoints = new ArrayList<>();
+        private List<String> contactPoints;
 
         /** Es. "DYNAMIC", "HTTP", "WFS" */
         @JsonProperty("type")
@@ -272,7 +271,7 @@ public class WFSDatasetExport implements Serializable {
 
         @JsonProperty("parameters")
         @SerializedName("parameters")
-        private List<Parameter> parameters = new ArrayList<>();
+        private List<Parameter> parameters;
 
         @JsonProperty("body_content_type")
         @SerializedName("body_content_type")
@@ -288,7 +287,7 @@ public class WFSDatasetExport implements Serializable {
 
         @JsonProperty("body_parameters")
         @SerializedName("body_parameters")
-        private List<BodyParameter> bodyParameters = new ArrayList<>();
+        private List<BodyParameter> bodyParameters;
 
         @JsonProperty("format")
         @SerializedName("format")
@@ -307,7 +306,7 @@ public class WFSDatasetExport implements Serializable {
 
         @JsonProperty("feature_types")
         @SerializedName("feature_types")
-        private List<String> featureTypes = new ArrayList<>();
+        private List<String> featureTypes;
 
         @JsonProperty("default_feature_type")
         @SerializedName("default_feature_type")
@@ -315,7 +314,7 @@ public class WFSDatasetExport implements Serializable {
 
         @JsonProperty("output_formats")
         @SerializedName("output_formats")
-        private List<String> outputFormats = new ArrayList<>();
+        private List<String> outputFormats;
 
         @JsonProperty("default_output_format")
         @SerializedName("default_output_format")
@@ -451,12 +450,12 @@ public class WFSDatasetExport implements Serializable {
         /** "default" è una parola riservata in Java */
         @JsonProperty("default")
         @SerializedName("default")
-        private List<String> defaultValues = new ArrayList<>();
+        private List<String> defaultValues;
 
         /** "enum" è una parola riservata in Java */
         @JsonProperty("enum")
         @SerializedName("enum")
-        private List<String> enumValues = new ArrayList<>();
+        private List<String> enumValues;
 
         @JsonProperty("pattern")
         @SerializedName("pattern")

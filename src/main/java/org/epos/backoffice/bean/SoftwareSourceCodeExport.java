@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.gson.annotations.SerializedName;
 
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -50,7 +49,7 @@ public class SoftwareSourceCodeExport implements Serializable {
 
         @JsonProperty("keywords")
         @SerializedName("keywords")
-        private List<String> keywords = new ArrayList<>();
+        private List<String> keywords;
 
         @JsonProperty("repository")
         @SerializedName("repository")
@@ -82,19 +81,19 @@ public class SoftwareSourceCodeExport implements Serializable {
 
         @JsonProperty("creators")
         @SerializedName("creators")
-        private List<String> creators = new ArrayList<>();
+        private List<String> creators;
 
         @JsonProperty("identifiers")
         @SerializedName("identifiers")
-        private List<Identifier> identifiers = new ArrayList<>();
+        private List<Identifier> identifiers;
 
         @JsonProperty("categories")
         @SerializedName("categories")
-        private List<String> categories = new ArrayList<>();
+        private List<String> categories;
 
         @JsonProperty("contact_points")
         @SerializedName("contact_points")
-        private List<String> contactPoints = new ArrayList<>();
+        private List<String> contactPoints;
 
         public Metadata() {
         }

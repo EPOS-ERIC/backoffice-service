@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.gson.annotations.SerializedName;
 
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -49,7 +48,7 @@ public class DownloadableFileExport implements Serializable {
 
         @JsonProperty("keywords")
         @SerializedName("keywords")
-        private List<String> keywords = new ArrayList<>();
+        private List<String> keywords;
 
         /** Es. "TRIENNIAL" */
         @JsonProperty("accrual_periodicity")
@@ -67,7 +66,7 @@ public class DownloadableFileExport implements Serializable {
 
         @JsonProperty("distributions")
         @SerializedName("distributions")
-        private List<Distribution> distributions = new ArrayList<>();
+        private List<Distribution> distributions;
 
         /** Geometria in formato WKT, es. "POINT (12.5 41.9)" */
         @JsonProperty("spatial_coverage")
@@ -84,19 +83,19 @@ public class DownloadableFileExport implements Serializable {
 
         @JsonProperty("persistent_identifiers")
         @SerializedName("persistent_identifiers")
-        private List<PersistentIdentifier> persistentIdentifiers = new ArrayList<>();
+        private List<PersistentIdentifier> persistentIdentifiers;
 
         @JsonProperty("contact_points")
         @SerializedName("contact_points")
-        private List<String> contactPoints = new ArrayList<>();
+        private List<String> contactPoints;
 
         @JsonProperty("providers")
         @SerializedName("providers")
-        private List<String> providers = new ArrayList<>();
+        private List<String> providers;
 
         @JsonProperty("categories")
         @SerializedName("categories")
-        private List<String> categories = new ArrayList<>();
+        private List<String> categories;
 
         @JsonProperty("created")
         @SerializedName("created")
