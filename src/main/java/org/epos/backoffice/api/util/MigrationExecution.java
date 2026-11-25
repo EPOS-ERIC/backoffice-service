@@ -80,7 +80,7 @@ public class MigrationExecution {
 
     private static List<String> splitKeywords(String keywords) {
         if (keywords == null || keywords.isBlank()) return new ArrayList<>();
-        return Arrays.stream(keywords.split(","))
+        return Arrays.stream(keywords.replace("/"," ").split(","))
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
                 .collect(Collectors.toList());

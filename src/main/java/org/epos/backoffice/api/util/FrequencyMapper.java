@@ -26,8 +26,8 @@ public final class FrequencyMapper {
             Map.entry("semiweekly",        "WEEKLY_2"),
             Map.entry("threetimesaweek",   "WEEKLY_3"),
             Map.entry("daily",             "DAILY"),
-            Map.entry("continuous",        "CONT"),
-            Map.entry("irregular",         "IRREG")
+            Map.entry("continuous",        "CONTINUOUS"),
+            Map.entry("irregular",         "IRREGULAR")
     );
 
     private FrequencyMapper() {}
