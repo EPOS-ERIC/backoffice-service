@@ -1,6 +1,7 @@
 package org.epos.backoffice.bean;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.gson.annotations.SerializedName;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -15,9 +16,11 @@ public class WFSDatasetExport implements Serializable {
     private static final long serialVersionUID = 1L;
 
     @JsonProperty("resource_type")
+    @SerializedName("resource_type")
     private String resourceType;
 
     @JsonProperty("metadata")
+    @SerializedName("metadata")
     private Metadata metadata;
 
     public WFSDatasetExport() {
@@ -37,54 +40,70 @@ public class WFSDatasetExport implements Serializable {
         private static final long serialVersionUID = 1L;
 
         @JsonProperty("title")
+        @SerializedName("title")
         private String title;
 
         @JsonProperty("description")
+        @SerializedName("description")
         private String description;
 
         @JsonProperty("keywords")
+        @SerializedName("keywords")
         private List<String> keywords = new ArrayList<>();
 
         /** Es. "TRIENNIAL" */
         @JsonProperty("accrual_periodicity")
+        @SerializedName("accrual_periodicity")
         private String accrualPeriodicity;
 
         @JsonProperty("quality_annotation")
+        @SerializedName("quality_annotation")
         private String qualityAnnotation;
 
         /** Es. "NON_PUBLIC" */
         @JsonProperty("access_right")
+        @SerializedName("access_right")
         private String accessRight;
 
         @JsonProperty("distributions")
+        @SerializedName("distributions")
         private List<Distribution> distributions = new ArrayList<>();
 
         /** Geometria in formato WKT, es. "POINT (12.5 41.9)" */
         @JsonProperty("spatial_coverage")
+        @SerializedName("spatial_coverage")
         private String spatialCoverage;
 
         @JsonProperty("temporal_coverage")
+        @SerializedName("temporal_coverage")
         private TemporalCoverage temporalCoverage;
 
         @JsonProperty("geological_temporal_coverage")
+        @SerializedName("geological_temporal_coverage")
         private GeologicalTemporalCoverage geologicalTemporalCoverage;
 
         @JsonProperty("persistent_identifiers")
+        @SerializedName("persistent_identifiers")
         private List<PersistentIdentifier> persistentIdentifiers = new ArrayList<>();
 
         @JsonProperty("contact_points")
+        @SerializedName("contact_points")
         private List<String> contactPoints = new ArrayList<>();
 
         @JsonProperty("providers")
+        @SerializedName("providers")
         private List<String> providers = new ArrayList<>();
 
         @JsonProperty("categories")
+        @SerializedName("categories")
         private List<String> categories = new ArrayList<>();
 
         @JsonProperty("created")
+        @SerializedName("created")
         private String created;
 
         @JsonProperty("updated")
+        @SerializedName("updated")
         private String updated;
 
         public Metadata() {
@@ -147,30 +166,38 @@ public class WFSDatasetExport implements Serializable {
         private static final long serialVersionUID = 1L;
 
         @JsonProperty("resource_id")
+        @SerializedName("resource_id")
         private String resourceId;
 
         @JsonProperty("title")
+        @SerializedName("title")
         private String title;
 
         @JsonProperty("description")
+        @SerializedName("description")
         private String description;
 
         @JsonProperty("license")
+        @SerializedName("license")
         private String license;
 
         /** Es. "DOWNLOADABLE_FILE", "WEB_SERVICE" */
         @JsonProperty("type")
+        @SerializedName("type")
         private String type;
 
         @JsonProperty("byte_size")
+        @SerializedName("byte_size")
         private Long byteSize;
 
         /** Valorizzato quando type = "DOWNLOADABLE_FILE" */
         @JsonProperty("downloadable_file")
+        @SerializedName("downloadable_file")
         private DownloadableFile downloadableFile;
 
         /** Valorizzato quando type = "WEB_SERVICE" */
         @JsonProperty("web_service")
+        @SerializedName("web_service")
         private WebService webService;
 
         public Distribution() {
@@ -209,75 +236,97 @@ public class WFSDatasetExport implements Serializable {
         private static final long serialVersionUID = 1L;
 
         @JsonProperty("resource_id")
+        @SerializedName("resource_id")
         private String resourceId;
 
         /** Es. ["GRAPH"] */
         @JsonProperty("visible_on")
+        @SerializedName("visible_on")
         private List<String> visibleOn = new ArrayList<>();
 
         @JsonProperty("provider")
+        @SerializedName("provider")
         private String provider;
 
         @JsonProperty("documentation_uri")
+        @SerializedName("documentation_uri")
         private String documentationUri;
 
         @JsonProperty("contact_points")
+        @SerializedName("contact_points")
         private List<String> contactPoints = new ArrayList<>();
 
         /** Es. "DYNAMIC", "HTTP", "WFS" */
         @JsonProperty("type")
+        @SerializedName("type")
         private String type;
 
         @JsonProperty("template_url")
+        @SerializedName("template_url")
         private String templateUrl;
 
         /** Es. "GET" */
         @JsonProperty("method")
+        @SerializedName("method")
         private String method;
 
         @JsonProperty("parameters")
+        @SerializedName("parameters")
         private List<Parameter> parameters = new ArrayList<>();
 
         @JsonProperty("body_content_type")
+        @SerializedName("body_content_type")
         private String bodyContentType;
 
         @JsonProperty("body_template")
+        @SerializedName("body_template")
         private String bodyTemplate;
 
         @JsonProperty("body_required")
+        @SerializedName("body_required")
         private Boolean bodyRequired;
 
         @JsonProperty("body_parameters")
+        @SerializedName("body_parameters")
         private List<BodyParameter> bodyParameters = new ArrayList<>();
 
         @JsonProperty("format")
+        @SerializedName("format")
         private String format;
 
         // --- Campi specifici dei servizi WFS (type = "WFS") ---
 
         @JsonProperty("get_feature_template_url")
+        @SerializedName("get_feature_template_url")
         private String getFeatureTemplateUrl;
 
         /** Versione WFS, es. "1.1.0" */
         @JsonProperty("version")
+        @SerializedName("version")
         private String version;
 
         @JsonProperty("feature_types")
+        @SerializedName("feature_types")
         private List<String> featureTypes = new ArrayList<>();
 
         @JsonProperty("default_feature_type")
+        @SerializedName("default_feature_type")
         private String defaultFeatureType;
 
         @JsonProperty("output_formats")
+        @SerializedName("output_formats")
         private List<String> outputFormats = new ArrayList<>();
 
         @JsonProperty("default_output_format")
+        @SerializedName("default_output_format")
         private String defaultOutputFormat;
 
         @JsonProperty("result_limit")
+        @SerializedName("result_limit")
         private Integer resultLimit;
 
         @JsonProperty("result_limit_editable")
+        @SerializedName("result_limit_editable")
         private Boolean resultLimitEditable;
 
         public WebService() {
@@ -358,46 +407,59 @@ public class WFSDatasetExport implements Serializable {
         private static final long serialVersionUID = 1L;
 
         @JsonProperty("resource_id")
+        @SerializedName("resource_id")
         private String resourceId;
 
         /** Es. "STRING" */
         @JsonProperty("kind")
+        @SerializedName("kind")
         private String kind;
 
         @JsonProperty("position")
+        @SerializedName("position")
         private Integer position;
 
         @JsonProperty("name")
+        @SerializedName("name")
         private String name;
 
         @JsonProperty("label")
+        @SerializedName("label")
         private String label;
 
         @JsonProperty("description")
+        @SerializedName("description")
         private String description;
 
         @JsonProperty("required")
+        @SerializedName("required")
         private Boolean required;
 
         @JsonProperty("property")
+        @SerializedName("property")
         private String property;
 
         /** Es. "FORMAT" */
         @JsonProperty("role")
+        @SerializedName("role")
         private String role;
 
         @JsonProperty("read_only")
+        @SerializedName("read_only")
         private Boolean readOnly;
 
         /** "default" è una parola riservata in Java */
         @JsonProperty("default")
+        @SerializedName("default")
         private List<String> defaultValues = new ArrayList<>();
 
         /** "enum" è una parola riservata in Java */
         @JsonProperty("enum")
+        @SerializedName("enum")
         private List<String> enumValues = new ArrayList<>();
 
         @JsonProperty("pattern")
+        @SerializedName("pattern")
         private String pattern;
 
         public BodyParameter() {
@@ -452,12 +514,15 @@ public class WFSDatasetExport implements Serializable {
 
         /** Es. "PATH", "QUERY" */
         @JsonProperty("location")
+        @SerializedName("location")
         private String location;
 
         @JsonProperty("explode")
+        @SerializedName("explode")
         private Boolean explode;
 
         @JsonProperty("multiple_values")
+        @SerializedName("multiple_values")
         private Boolean multipleValues;
 
         public Parameter() {
@@ -481,9 +546,11 @@ public class WFSDatasetExport implements Serializable {
         private static final long serialVersionUID = 1L;
 
         @JsonProperty("url")
+        @SerializedName("url")
         private String url;
 
         @JsonProperty("format")
+        @SerializedName("format")
         private String format;
 
         public DownloadableFile() {
@@ -504,9 +571,11 @@ public class WFSDatasetExport implements Serializable {
         private static final long serialVersionUID = 1L;
 
         @JsonProperty("start")
+        @SerializedName("start")
         private String start;
 
         @JsonProperty("end")
+        @SerializedName("end")
         private String end;
 
         public TemporalCoverage() {
@@ -528,10 +597,12 @@ public class WFSDatasetExport implements Serializable {
 
         /** Milioni di anni fa (inizio) */
         @JsonProperty("start_mya")
+        @SerializedName("start_mya")
         private Double startMya;
 
         /** Milioni di anni fa (fine) */
         @JsonProperty("end_mya")
+        @SerializedName("end_mya")
         private Double endMya;
 
         public GeologicalTemporalCoverage() {
@@ -552,12 +623,15 @@ public class WFSDatasetExport implements Serializable {
         private static final long serialVersionUID = 1L;
 
         @JsonProperty("resource_id")
+        @SerializedName("resource_id")
         private String resourceId;
 
         @JsonProperty("type")
+        @SerializedName("type")
         private String type;
 
         @JsonProperty("value")
+        @SerializedName("value")
         private String value;
 
         public PersistentIdentifier() {

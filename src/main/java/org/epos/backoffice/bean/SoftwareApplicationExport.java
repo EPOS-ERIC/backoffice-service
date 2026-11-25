@@ -1,6 +1,7 @@
 package org.epos.backoffice.bean;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.gson.annotations.SerializedName;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -16,9 +17,11 @@ public class SoftwareApplicationExport implements Serializable {
 
     /** Es. "software-application" */
     @JsonProperty("resource_type")
+    @SerializedName("resource_type")
     private String resourceType;
 
     @JsonProperty("metadata")
+    @SerializedName("metadata")
     private Metadata metadata;
 
     public SoftwareApplicationExport() {
@@ -38,42 +41,55 @@ public class SoftwareApplicationExport implements Serializable {
         private static final long serialVersionUID = 1L;
 
         @JsonProperty("name")
+        @SerializedName("name")
         private String name;
 
         @JsonProperty("description")
+        @SerializedName("description")
         private String description;
 
         @JsonProperty("keywords")
+        @SerializedName("keywords")
         private List<String> keywords = new ArrayList<>();
 
         @JsonProperty("license")
+        @SerializedName("license")
         private String license;
 
         @JsonProperty("version")
+        @SerializedName("version")
         private String version;
 
         @JsonProperty("download_url")
+        @SerializedName("download_url")
         private String downloadUrl;
 
         @JsonProperty("requirements")
+        @SerializedName("requirements")
         private String requirements;
 
         @JsonProperty("operating_system")
+        @SerializedName("operating_system")
         private String operatingSystem;
 
         @JsonProperty("main_entity_of_page")
+        @SerializedName("main_entity_of_page")
         private String mainEntityOfPage;
 
         @JsonProperty("creators")
+        @SerializedName("creators")
         private List<String> creators = new ArrayList<>();
 
         @JsonProperty("identifiers")
+        @SerializedName("identifiers")
         private List<Identifier> identifiers = new ArrayList<>();
 
         @JsonProperty("categories")
+        @SerializedName("categories")
         private List<String> categories = new ArrayList<>();
 
         @JsonProperty("contact_points")
+        @SerializedName("contact_points")
         private List<String> contactPoints = new ArrayList<>();
 
         public Metadata() {
@@ -127,12 +143,15 @@ public class SoftwareApplicationExport implements Serializable {
         private static final long serialVersionUID = 1L;
 
         @JsonProperty("resource_id")
+        @SerializedName("resource_id")
         private String resourceId;
 
         @JsonProperty("type")
+        @SerializedName("type")
         private String type;
 
         @JsonProperty("value")
+        @SerializedName("value")
         private String value;
 
         public Identifier() {

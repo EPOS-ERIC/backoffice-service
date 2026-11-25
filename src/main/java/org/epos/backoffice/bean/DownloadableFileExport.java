@@ -1,6 +1,7 @@
 package org.epos.backoffice.bean;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.gson.annotations.SerializedName;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -15,9 +16,11 @@ public class DownloadableFileExport implements Serializable {
     private static final long serialVersionUID = 1L;
 
     @JsonProperty("resource_type")
+    @SerializedName("resource_type")
     private String resourceType;
 
     @JsonProperty("metadata")
+    @SerializedName("metadata")
     private Metadata metadata;
 
     public DownloadableFileExport() {
@@ -37,54 +40,70 @@ public class DownloadableFileExport implements Serializable {
         private static final long serialVersionUID = 1L;
 
         @JsonProperty("title")
+        @SerializedName("title")
         private String title;
 
         @JsonProperty("description")
+        @SerializedName("description")
         private String description;
 
         @JsonProperty("keywords")
+        @SerializedName("keywords")
         private List<String> keywords = new ArrayList<>();
 
         /** Es. "TRIENNIAL" */
         @JsonProperty("accrual_periodicity")
+        @SerializedName("accrual_periodicity")
         private String accrualPeriodicity;
 
         @JsonProperty("quality_annotation")
+        @SerializedName("quality_annotation")
         private String qualityAnnotation;
 
         /** Es. "NON_PUBLIC" */
         @JsonProperty("access_right")
+        @SerializedName("access_right")
         private String accessRight;
 
         @JsonProperty("distributions")
+        @SerializedName("distributions")
         private List<Distribution> distributions = new ArrayList<>();
 
         /** Geometria in formato WKT, es. "POINT (12.5 41.9)" */
         @JsonProperty("spatial_coverage")
+        @SerializedName("spatial_coverage")
         private String spatialCoverage;
 
         @JsonProperty("temporal_coverage")
+        @SerializedName("temporal_coverage")
         private TemporalCoverage temporalCoverage;
 
         @JsonProperty("geological_temporal_coverage")
+        @SerializedName("geological_temporal_coverage")
         private GeologicalTemporalCoverage geologicalTemporalCoverage;
 
         @JsonProperty("persistent_identifiers")
+        @SerializedName("persistent_identifiers")
         private List<PersistentIdentifier> persistentIdentifiers = new ArrayList<>();
 
         @JsonProperty("contact_points")
+        @SerializedName("contact_points")
         private List<String> contactPoints = new ArrayList<>();
 
         @JsonProperty("providers")
+        @SerializedName("providers")
         private List<String> providers = new ArrayList<>();
 
         @JsonProperty("categories")
+        @SerializedName("categories")
         private List<String> categories = new ArrayList<>();
 
         @JsonProperty("created")
+        @SerializedName("created")
         private String created;
 
         @JsonProperty("updated")
+        @SerializedName("updated")
         private String updated;
 
         public Metadata() {
@@ -147,25 +166,32 @@ public class DownloadableFileExport implements Serializable {
         private static final long serialVersionUID = 1L;
 
         @JsonProperty("resource_id")
+        @SerializedName("resource_id")
         private String resourceId;
 
         @JsonProperty("title")
+        @SerializedName("title")
         private String title;
 
         @JsonProperty("description")
+        @SerializedName("description")
         private String description;
 
         @JsonProperty("license")
+        @SerializedName("license")
         private String license;
 
         /** Es. "DOWNLOADABLE_FILE" */
         @JsonProperty("type")
+        @SerializedName("type")
         private String type;
 
         @JsonProperty("byte_size")
+        @SerializedName("byte_size")
         private Long byteSize;
 
         @JsonProperty("downloadable_file")
+        @SerializedName("downloadable_file")
         private DownloadableFile downloadableFile;
 
         public Distribution() {
@@ -201,9 +227,11 @@ public class DownloadableFileExport implements Serializable {
         private static final long serialVersionUID = 1L;
 
         @JsonProperty("url")
+        @SerializedName("url")
         private String url;
 
         @JsonProperty("format")
+        @SerializedName("format")
         private String format;
 
         public DownloadableFile() {
@@ -224,9 +252,11 @@ public class DownloadableFileExport implements Serializable {
         private static final long serialVersionUID = 1L;
 
         @JsonProperty("start")
+        @SerializedName("start")
         private String start;
 
         @JsonProperty("end")
+        @SerializedName("end")
         private String end;
 
         public TemporalCoverage() {
@@ -248,10 +278,12 @@ public class DownloadableFileExport implements Serializable {
 
         /** Milioni di anni fa (inizio) */
         @JsonProperty("start_mya")
+        @SerializedName("start_mya")
         private Double startMya;
 
         /** Milioni di anni fa (fine) */
         @JsonProperty("end_mya")
+        @SerializedName("end_mya")
         private Double endMya;
 
         public GeologicalTemporalCoverage() {
@@ -272,12 +304,15 @@ public class DownloadableFileExport implements Serializable {
         private static final long serialVersionUID = 1L;
 
         @JsonProperty("resource_id")
+        @SerializedName("resource_id")
         private String resourceId;
 
         @JsonProperty("type")
+        @SerializedName("type")
         private String type;
 
         @JsonProperty("value")
+        @SerializedName("value")
         private String value;
 
         public PersistentIdentifier() {
