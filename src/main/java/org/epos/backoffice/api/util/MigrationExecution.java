@@ -367,13 +367,13 @@ public class MigrationExecution {
                         boolean multiple = bool(mapping1.getMultipleValues());
                         parameter.setMultipleValues(multiple);
                         parameter.setExplode(multiple);
-                        if(!mapping1.getDefaultValue().isBlank()) parameter.setDefaultValues(singletonOrEmpty(mapping1.getDefaultValue()));
+                        if(mapping1.getDefaultValue()!=null && !mapping1.getDefaultValue().isBlank()) parameter.setDefaultValues(singletonOrEmpty(mapping1.getDefaultValue()));
                         if(mapping1.getParamValue()!=null && !mapping1.getParamValue().isEmpty()) parameter.setEnumValues(new ArrayList<>(safe(mapping1.getParamValue())));
                         parameter.setLabel(mapping1.getLabel());
                         parameter.setName(mapping1.getVariable());
-                        if(!mapping1.getValuePattern().isBlank()) parameter.setPattern(mapping1.getValuePattern());
+                        if(mapping1.getValuePattern()!=null && !mapping1.getValuePattern().isBlank()) parameter.setPattern(mapping1.getValuePattern());
                         parameter.setPosition(position);
-                        if(!mapping1.getProperty().isBlank()) {
+                        if(mapping1.getProperty()!=null && !mapping1.getProperty().isBlank()) {
                             parameter.setProperty(mapping1.getProperty());
                             if(mapping1.getProperty().contains("encodingFormat")) parameter.setRole("FORMAT");
                             if(mapping1.getProperty().contains("startDate")) parameter.setRole("START_DATE");
@@ -477,13 +477,13 @@ public class MigrationExecution {
                         boolean multiple = bool(mapping1.getMultipleValues());
                         parameter.setMultipleValues(multiple);
                         parameter.setExplode(multiple);
-                        if(!mapping1.getDefaultValue().isBlank()) parameter.setDefaultValues(singletonOrEmpty(mapping1.getDefaultValue()));
+                        if(mapping1.getDefaultValue()!=null && !mapping1.getDefaultValue().isBlank()) parameter.setDefaultValues(singletonOrEmpty(mapping1.getDefaultValue()));
                         if(mapping1.getParamValue()!=null && !mapping1.getParamValue().isEmpty()) parameter.setEnumValues(new ArrayList<>(safe(mapping1.getParamValue())));
                         parameter.setLabel(mapping1.getLabel());
                         parameter.setName(mapping1.getVariable());
-                        if(!mapping1.getValuePattern().isBlank()) parameter.setPattern(mapping1.getValuePattern());
+                        if(mapping1.getValuePattern()!=null && !mapping1.getValuePattern().isBlank()) parameter.setPattern(mapping1.getValuePattern());
                         parameter.setPosition(position);
-                        if(!mapping1.getProperty().isBlank()) {
+                        if(mapping1.getProperty()!=null && !mapping1.getProperty().isBlank()) {
                             parameter.setProperty(mapping1.getProperty());
                             if(mapping1.getProperty().contains("encodingFormat")) parameter.setRole("FORMAT");
                             if(mapping1.getProperty().contains("startDate")) parameter.setRole("START_DATE");
@@ -588,13 +588,13 @@ public class MigrationExecution {
                         boolean multiple = bool(mapping1.getMultipleValues());
                         parameter.setMultipleValues(multiple);
                         parameter.setExplode(multiple);
-                        if(!mapping1.getDefaultValue().isBlank()) parameter.setDefaultValues(singletonOrEmpty(mapping1.getDefaultValue()));
+                        if(mapping1.getDefaultValue()!=null && !mapping1.getDefaultValue().isBlank()) parameter.setDefaultValues(singletonOrEmpty(mapping1.getDefaultValue()));
                         if(mapping1.getParamValue()!=null && !mapping1.getParamValue().isEmpty()) parameter.setEnumValues(new ArrayList<>(safe(mapping1.getParamValue())));
                         parameter.setLabel(mapping1.getLabel());
                         parameter.setName(mapping1.getVariable());
-                        if(!mapping1.getValuePattern().isBlank()) parameter.setPattern(mapping1.getValuePattern());
+                        if(mapping1.getValuePattern()!=null && !mapping1.getValuePattern().isBlank()) parameter.setPattern(mapping1.getValuePattern());
                         parameter.setPosition(position);
-                        if(!mapping1.getProperty().isBlank()) {
+                        if(mapping1.getProperty()!=null && !mapping1.getProperty().isBlank()) {
                             parameter.setProperty(mapping1.getProperty());
                             if(mapping1.getProperty().contains("encodingFormat")) parameter.setRole("FORMAT");
                             if(mapping1.getProperty().contains("startDate")) parameter.setRole("START_DATE");
@@ -698,13 +698,13 @@ public class MigrationExecution {
                         boolean multiple = bool(mapping1.getMultipleValues());
                         parameter.setMultipleValues(multiple);
                         parameter.setExplode(multiple);
-                        if(!mapping1.getDefaultValue().isBlank()) parameter.setDefaultValues(singletonOrEmpty(mapping1.getDefaultValue()));
+                        if(mapping1.getDefaultValue()!=null && !mapping1.getDefaultValue().isBlank()) parameter.setDefaultValues(singletonOrEmpty(mapping1.getDefaultValue()));
                         if(mapping1.getParamValue()!=null && !mapping1.getParamValue().isEmpty()) parameter.setEnumValues(new ArrayList<>(safe(mapping1.getParamValue())));
                         parameter.setLabel(mapping1.getLabel());
                         parameter.setName(mapping1.getVariable());
-                        if(!mapping1.getValuePattern().isBlank()) parameter.setPattern(mapping1.getValuePattern());
+                        if(mapping1.getValuePattern()!=null && !mapping1.getValuePattern().isBlank()) parameter.setPattern(mapping1.getValuePattern());
                         parameter.setPosition(position);
-                        if(!mapping1.getProperty().isBlank()) {
+                        if(mapping1.getProperty()!=null && !mapping1.getProperty().isBlank()) {
                             parameter.setProperty(mapping1.getProperty());
                             if(mapping1.getProperty().contains("encodingFormat")) parameter.setRole("FORMAT");
                             if(mapping1.getProperty().contains("startDate")) parameter.setRole("START_DATE");
@@ -808,13 +808,13 @@ public class MigrationExecution {
                         boolean multiple = bool(mapping1.getMultipleValues());
                         parameter.setMultipleValues(multiple);
                         parameter.setExplode(multiple);
-                        if(!mapping1.getDefaultValue().isBlank()) parameter.setDefaultValues(singletonOrEmpty(mapping1.getDefaultValue()));
+                        if(mapping1.getDefaultValue()!=null && !mapping1.getDefaultValue().isBlank()) parameter.setDefaultValues(singletonOrEmpty(mapping1.getDefaultValue()));
                         if(mapping1.getParamValue()!=null && !mapping1.getParamValue().isEmpty()) parameter.setEnumValues(new ArrayList<>(safe(mapping1.getParamValue())));
                         parameter.setLabel(mapping1.getLabel());
                         parameter.setName(mapping1.getVariable());
-                        if(!mapping1.getValuePattern().isBlank()) parameter.setPattern(mapping1.getValuePattern());
+                        if(mapping1.getValuePattern()!=null && !mapping1.getValuePattern().isBlank()) parameter.setPattern(mapping1.getValuePattern());
                         parameter.setPosition(position);
-                        if(!mapping1.getProperty().isBlank()) {
+                        if(mapping1.getProperty()!=null && !mapping1.getProperty().isBlank()) {
                             parameter.setProperty(mapping1.getProperty());
                             if(mapping1.getProperty().contains("encodingFormat")) parameter.setRole("FORMAT");
                             if(mapping1.getProperty().contains("startDate")) parameter.setRole("START_DATE");
