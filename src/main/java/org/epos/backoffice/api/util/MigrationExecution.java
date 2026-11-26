@@ -268,6 +268,11 @@ public class MigrationExecution {
             if (!element.isJsonObject()) continue;
             JsonObject parameter = element.getAsJsonObject();
             parameter.remove("property");
+            if (parameter.has("location") && "PATH".equals(parameter.get("location").getAsString())
+                    && (!parameter.has("required") || !parameter.get("required").getAsBoolean())) {
+                log.warn("Marking path parameter {} as required for the Gateway", parameter.get("name"));
+                parameter.addProperty("required", true);
+            }
             String role = parameter.has("role") ? parameter.get("role").getAsString() : "";
             if ("FORMAT".equals(role) && (!parameter.has("read_only") || !parameter.get("read_only").getAsBoolean()
                     || (parameter.has("multiple_values") && parameter.get("multiple_values").getAsBoolean())
@@ -279,6 +284,11 @@ public class MigrationExecution {
             boolean dynamicCoordinate = List.of("LONGITUDE", "LATITUDE").contains(role);
             boolean coordinate = dynamicCoordinate || List.of("MIN_LON", "MAX_LON", "MIN_LAT", "MAX_LAT").contains(role);
             boolean date = List.of("START_DATE", "END_DATE").contains(role);
+            if (!date && !coordinate && parameter.has("pattern")) {
+                String pattern = parameter.get("pattern").getAsString();
+                if (pattern.equals("YYYYMMDD")) parameter.addProperty("pattern", "^[0-9]{8}$");
+                else if (pattern.equals("YYYY-MM-DDThh:mm:ssZ")) parameter.addProperty("pattern", "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$");
+            }
             if (coordinate) {
                 if (dynamicCoordinate && (!parameter.has("required") || !parameter.get("required").getAsBoolean()
                         || !parameter.has("read_only") || parameter.get("read_only").getAsBoolean()
@@ -324,6 +334,10 @@ public class MigrationExecution {
                 JsonArray options = new JsonArray();
                 for (JsonElement value : parameter.getAsJsonArray("enum")) {
                     if (value.isJsonPrimitive() && value.getAsJsonPrimitive().isString()) {
+                        if (value.getAsString().isBlank()) {
+                            log.warn("Ignoring blank enum value for parameter {}", parameter.get("name"));
+                            continue;
+                        }
                         JsonObject option = new JsonObject();
                         option.add("value", coordinate ? new JsonPrimitive(new BigDecimal(value.getAsString())) : value.deepCopy());
                         options.add(option);
@@ -448,7 +462,8 @@ public class MigrationExecution {
                 Organization provider = resolve(rd.webService.getProvider(), Organization.class);
                 rd.providerName = provider != null ? first(provider.getLegalName()) : null;
                 Documentation documentation = resolve(first(rd.webService.getDocumentation()), Documentation.class);
-                rd.documentationUri = documentation != null ? documentation.getUri() : null;
+                rd.documentationUri = documentation != null && documentation.getUri() != null && !documentation.getUri().isBlank()
+                        ? documentation.getUri() : null;
             }
 
             rd.operation = resolve(first(distribution.getSupportedOperation()), Operation.class);

@@ -11,6 +11,26 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class MigrationDraftParameterTest {
     @Test
+    void fixesLegacyPathDatesAndBlankEnumValues() {
+        JsonObject payload = JsonParser.parseString("""
+                {"metadata":{"distributions":[{"web_service":{"parameters":[
+                  {"name":"path","kind":"STRING","location":"PATH","required":false,"enum":["","valid"]},
+                  {"name":"start","kind":"STRING","pattern":"YYYYMMDD","default":["19821001"]},
+                  {"name":"publication_date","kind":"STRING","pattern":"YYYY-MM-DDThh:mm:ssZ","default":["2022-03-01T10:00:00Z"]}
+                ]}}]}}
+                """).getAsJsonObject();
+        MigrationExecution.normalizeDraftParameters(payload);
+        var parameters = payload.getAsJsonObject("metadata").getAsJsonArray("distributions").get(0)
+                .getAsJsonObject().getAsJsonObject("web_service").getAsJsonArray("parameters");
+        assertEquals(true, parameters.get(0).getAsJsonObject().get("required").getAsBoolean());
+        assertEquals(1, parameters.get(0).getAsJsonObject().getAsJsonArray("enum").size());
+        for (int i = 1; i < 3; i++) {
+            JsonObject parameter = parameters.get(i).getAsJsonObject();
+            assertEquals(true, java.util.regex.Pattern.compile(parameter.get("pattern").getAsString())
+                    .matcher(parameter.getAsJsonArray("default").get(0).getAsString()).find());
+        }
+    }
+    @Test
     void movesQueryPlaceholdersToQueryParameters() {
         JsonObject service = JsonParser.parseString("""
                 {"type":"HTTP","template_url":"https://example.org/api?fixed=1&feature_layer={name}",
