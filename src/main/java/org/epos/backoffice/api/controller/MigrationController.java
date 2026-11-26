@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 import java.lang.reflect.Type;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.function.Supplier;
 
 @RestController
 @RequestMapping(
@@ -81,6 +82,50 @@ public class MigrationController implements ApiDocTag{
                 .body(gson.toJson(error));
     }
 
+    ResponseEntity<String> migrationResponse(String instanceId, String type, Supplier<JsonObject> export) {
+        MigrationExecution.beginMigrationDebug();
+        JsonObject payload;
+        JsonArray events;
+        try {
+            payload = export.get();
+        } catch (IllegalArgumentException e) {
+            events = MigrationExecution.endMigrationDebug();
+            JsonObject debug = new JsonObject();
+            debug.addProperty("instanceid", instanceId);
+            debug.addProperty("type", type);
+            debug.add("events", events);
+            debug.addProperty("error", e.getMessage());
+            JsonObject response = new JsonObject();
+            response.add("debug", debug);
+            response.add("payload", JsonNull.INSTANCE);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).contentType(MediaType.APPLICATION_JSON)
+                    .body(gson.newBuilder().serializeNulls().create().toJson(response));
+        } catch (RuntimeException e) {
+            events = MigrationExecution.endMigrationDebug();
+            log.error("Unexpected migration export error for {} {}", type, instanceId, e);
+            JsonObject debug = new JsonObject();
+            debug.addProperty("instanceid", instanceId);
+            debug.addProperty("type", type);
+            debug.add("events", events);
+            debug.addProperty("error", "Unexpected error during export");
+            JsonObject response = new JsonObject();
+            response.add("debug", debug);
+            response.add("payload", JsonNull.INSTANCE);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).contentType(MediaType.APPLICATION_JSON)
+                    .body(gson.newBuilder().serializeNulls().create().toJson(response));
+        }
+        events = MigrationExecution.endMigrationDebug();
+        if (payload == null || payload.isEmpty()) return toJsonResponse(payload);
+        JsonObject debug = new JsonObject();
+        debug.addProperty("instanceid", instanceId);
+        debug.addProperty("type", type);
+        debug.add("events", events);
+        JsonObject response = new JsonObject();
+        response.add("debug", debug);
+        response.add("payload", payload);
+        return toJsonResponse(response);
+    }
+
     @RequestMapping(produces = {"application/json"},
             method = RequestMethod.GET)
     @ResponseBody
@@ -125,7 +170,7 @@ public class MigrationController implements ApiDocTag{
             return jsonError(HttpStatus.UNAUTHORIZED, "Unauthorized: User not found in session.");
         }
 
-        return toJsonResponse(MigrationExecution.getDataset(instance_id, user));
+        return migrationResponse(instance_id, "Dataset", () -> MigrationExecution.getDataset(instance_id, user));
     }
 
     @RequestMapping(
@@ -150,7 +195,7 @@ public class MigrationController implements ApiDocTag{
             return jsonError(HttpStatus.UNAUTHORIZED, "Unauthorized: User not found in session.");
         }
 
-        return toJsonResponse(MigrationExecution.getSoftwareApplication(instance_id, user));
+        return migrationResponse(instance_id, "SoftwareApplication", () -> MigrationExecution.getSoftwareApplication(instance_id, user));
     }
 
     @RequestMapping(
@@ -175,6 +220,6 @@ public class MigrationController implements ApiDocTag{
             return jsonError(HttpStatus.UNAUTHORIZED, "Unauthorized: User not found in session.");
         }
 
-        return toJsonResponse(MigrationExecution.getSoftwareSourceCode(instance_id, user));
+        return migrationResponse(instance_id, "SoftwareSourceCode", () -> MigrationExecution.getSoftwareSourceCode(instance_id, user));
     }
 }

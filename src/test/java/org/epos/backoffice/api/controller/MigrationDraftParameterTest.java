@@ -11,6 +11,40 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class MigrationDraftParameterTest {
     @Test
+    void recordsFallbackAndOmitsInvalidWmsDistribution() {
+        MigrationExecution.beginMigrationDebug();
+        JsonObject payload = JsonParser.parseString("""
+                {"metadata":{"distributions":[
+                  {"title":"bad WMS","web_service":{"type":"WMS","template_url":"https://example.org/?q=prefix{variable}"}},
+                  {"title":"file","downloadable_file":{"url":"https://example.org/file"}}
+                ]}}
+                """).getAsJsonObject();
+        try {
+            assertEquals("Name", MigrationExecution.descriptionOrName("", "Name"));
+            MigrationExecution.normalizeDraftParameters(payload);
+            assertEquals(1, payload.getAsJsonObject("metadata").getAsJsonArray("distributions").size());
+            var events = MigrationExecution.endMigrationDebug();
+            assertEquals("description_fallback", events.get(0).getAsJsonObject().get("action").getAsString());
+            assertEquals("distribution_removed", events.get(2).getAsJsonObject().get("action").getAsString());
+        } finally {
+            MigrationExecution.endMigrationDebug();
+        }
+    }
+    @Test
+    void removesCompositeQueryPlaceholderAndKeepsFixedParameters() {
+        JsonObject service = JsonParser.parseString("""
+                {"type":"HTTP","template_url":"https://example.org/api?fixed=1&bbox={minLon,minLat,maxLon,maxLat}&other=2","parameters":[]}
+                """).getAsJsonObject();
+        MigrationExecution.normalizeQueryPlaceholders(service);
+        assertEquals("https://example.org/api?fixed=1&other=2", service.get("template_url").getAsString());
+    }
+    @Test
+    void fillsMissingDescriptionFromName() {
+        assertEquals("Name", MigrationExecution.descriptionOrName(" ", "Name"));
+        assertEquals("Description", MigrationExecution.descriptionOrName("Description", "Name"));
+        assertThrows(IllegalArgumentException.class, () -> MigrationExecution.descriptionOrName("", ""));
+    }
+    @Test
     void preservesFixedQueryBeforeRfc6570Continuation() {
         JsonObject service = JsonParser.parseString("""
                 {"type":"HTTP","template_url":"https://example.org/api?pt=MODEL{&start, end}",

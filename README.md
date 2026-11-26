@@ -1,5 +1,18 @@
 # Backoffice Service
 
+## Migration export
+
+The admin-only migration resource endpoints (`/migration/dataset/{id}`,
+`/migration/softwareapplication/{id}`, and `/migration/softwaresourcecode/{id}`)
+return `{ "payload": ..., "debug": { "instanceid": ..., "type": ..., "events": [...] } }`.
+Send only `payload` to the Gateway. The debug events describe detected changes and
+omitted distributions. An invalid export returns HTTP 500 with `payload: null` and
+the error and events in `debug`. The list endpoint retains its array response.
+
+When a WMS, WMTS, or WFS distribution cannot be converted from the available
+metadata, the exporter omits that distribution and records the reason. A draft can
+therefore be created with no distributions; review debug events before publishing.
+
 ## Concept
 We want to improve how the TCSs manage and edit the metadata they produced for the EPOS data portal. At the moment they are used to put all the metadata into the ttl file which are after ingest into the system throught the ingestor-service. They need to operate on these data in a more flexible way. 
 At the moment they operate directly on the file hosted on gitlab, this method permits to exploit the git version control in order to keep track of all the change (versioning). Moreover, the possibility to edit the file on gitlab and not directly the database is handy because they use it as a revision system, infact, when a TCS modify the data and commit the change these can be reviewed by other reviewers and also they can see how the new metadata will "look like" on the EPOS Data Portal GUI throught the generation of a new testing environment.

@@ -35,7 +35,28 @@ import java.util.stream.Collectors;
 public class MigrationExecution {
 
     private static final Logger log = LoggerFactory.getLogger(MigrationExecution.class);
+    private static final ThreadLocal<JsonArray> migrationDebug = new ThreadLocal<>();
     public static Gson gson = new Gson();
+
+    public static void beginMigrationDebug() {
+        migrationDebug.set(new JsonArray());
+    }
+
+    public static JsonArray endMigrationDebug() {
+        JsonArray events = migrationDebug.get();
+        migrationDebug.remove();
+        return events == null ? new JsonArray() : events;
+    }
+
+    private static void recordMigrationChange(String action, String detail) {
+        JsonArray events = migrationDebug.get();
+        if (events != null) {
+            JsonObject event = new JsonObject();
+            event.addProperty("action", action);
+            event.addProperty("detail", detail);
+            events.add(event);
+        }
+    }
 
     // =====================================================================
     // Null / existence check helpers
@@ -53,6 +74,9 @@ public class MigrationExecution {
     /** First non-null element of the list, or null if the list is null/empty. */
     private static <T> T first(List<T> list) {
         if (list == null) return null;
+        if (list.stream().filter(java.util.Objects::nonNull).limit(2).count() > 1) {
+            recordMigrationChange("first_value_selected", "Multiple source values found; only the first non-null value was exported");
+        }
         for (T t : list) {
             if (t != null) return t;
         }
@@ -63,8 +87,28 @@ public class MigrationExecution {
         return o == null ? null : o.toString();
     }
 
+    static String descriptionOrName(String description, String name) {
+        if (description != null && !description.isBlank()) return description;
+        if (name == null || name.isBlank()) {
+            throw new IllegalArgumentException("Cannot fill empty description: name or title is missing");
+        }
+        log.warn("Using resource name or title for an empty description");
+        recordMigrationChange("description_fallback", "Empty description replaced with resource name or title");
+        return name;
+    }
+
     private static String timestamp(LocalDateTime value) {
-        return value == null ? null : value.atOffset(ZoneOffset.UTC).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+        if (value == null) return null;
+        recordMigrationChange("timestamp_utc", "Source local timestamp exported assuming UTC");
+        return value.atOffset(ZoneOffset.UTC).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+    }
+
+    private static String migrationFormat(String value) {
+        String result = FileTypeMapper.toMimeType(value);
+        if (!java.util.Objects.equals(value, result)) {
+            recordMigrationChange("format_normalized", "Converted source file type to a MIME type");
+        }
+        return result;
     }
 
     private static boolean bool(Object o) {
@@ -107,7 +151,10 @@ public class MigrationExecution {
                     .replaceAll("\\p{M}+", "")
                     .replaceAll("[^A-Za-z0-9 _:-]+", " ")
                     .replaceAll(" +", " ").trim();
-            if (!normalized.equals(original)) log.warn("Normalizing a keyword for the Gateway");
+            if (!normalized.equals(original)) {
+                log.warn("Normalizing a keyword for the Gateway");
+                recordMigrationChange("keyword_normalized", "Normalized keyword: " + original + " -> " + normalized);
+            }
             if (!normalized.isEmpty()) result.add(normalized);
         }
         return result;
@@ -117,7 +164,9 @@ public class MigrationExecution {
         if (operation == null || operation.getTemplate() == null || operation.getTemplate().isBlank()) {
             throw new IllegalArgumentException("A web service distribution requires an operation with a template URL");
         }
-        return operation.getTemplate().split("\\{\\?", 2)[0];
+        String[] parts = operation.getTemplate().split("\\{\\?", 2);
+        if (parts.length > 1) recordMigrationChange("query_expansion_removed", "URI template query expansion removed from the URL and represented by parameters");
+        return parts[0];
     }
 
     private static boolean isPathParameter(String template, String variable) {
@@ -223,17 +272,34 @@ public class MigrationExecution {
         JsonObject metadata = item.has("metadata") && item.get("metadata").isJsonObject()
                 ? item.getAsJsonObject("metadata") : null;
         if (metadata == null || !metadata.has("distributions") || !metadata.get("distributions").isJsonArray()) return;
+        JsonArray retained = new JsonArray();
         for (JsonElement distribution : metadata.getAsJsonArray("distributions")) {
-            if (!distribution.isJsonObject()) continue;
+            if (!distribution.isJsonObject()) {
+                retained.add(distribution);
+                continue;
+            }
             JsonObject object = distribution.getAsJsonObject();
-            if (!object.has("web_service") || !object.get("web_service").isJsonObject()) continue;
+            if (!object.has("web_service") || !object.get("web_service").isJsonObject()) {
+                retained.add(distribution);
+                continue;
+            }
             JsonObject service = object.getAsJsonObject("web_service");
-            normalizeQueryPlaceholders(service);
-            for (String field : List.of("parameters", "body_parameters", "get_map_parameters", "get_tile_parameters", "get_feature_info_parameters")) {
-                if (!service.has(field) || !service.get(field).isJsonArray()) continue;
-                normalizeParameterArray(service.getAsJsonArray(field));
+            try {
+                recordMigrationChange("web_service_checked", "Checked web service for distribution " + object.get("title"));
+                normalizeQueryPlaceholders(service);
+                for (String field : List.of("parameters", "body_parameters", "get_map_parameters", "get_tile_parameters", "get_feature_info_parameters")) {
+                    if (!service.has(field) || !service.get(field).isJsonArray()) continue;
+                    normalizeParameterArray(service.getAsJsonArray(field));
+                }
+                retained.add(distribution);
+            } catch (IllegalArgumentException e) {
+                String kind = service.has("type") ? service.get("type").getAsString() : "";
+                if (!List.of("WMS", "WMTS", "WFS").contains(kind)) throw e;
+                recordMigrationChange("distribution_removed", kind + " distribution " + object.get("title") + ": " + e.getMessage());
+                log.warn("Skipping {} distribution {}: {}", kind, object.get("title"), e.getMessage());
             }
         }
+        metadata.add("distributions", retained);
     }
 
     static void normalizeQueryPlaceholders(JsonObject service) {
@@ -264,8 +330,10 @@ public class MigrationExecution {
                 }
                 if (found == null) {
                     log.warn("Omitting undefined optional query template variable {}", variable);
+                    recordMigrationChange("query_variable_removed", "Undefined optional query variable: " + variable);
                 } else {
                     found.addProperty("location", "QUERY");
+                    recordMigrationChange("query_variable_migrated", "Migrated query variable: " + variable);
                 }
             }
             continuation.appendReplacement(query, "");
@@ -277,6 +345,11 @@ public class MigrationExecution {
             int equals = pair.indexOf('=');
             String value = equals < 0 ? "" : pair.substring(equals + 1);
             Matcher match = placeholder.matcher(value);
+            if (match.matches() && match.group(1).contains(",")) {
+                log.warn("Removing unsupported composite query placeholder {}", URLDecoder.decode(pair.substring(0, equals), StandardCharsets.UTF_8));
+                recordMigrationChange("composite_query_removed", "Removed query expression: " + pair);
+                continue;
+            }
             if (!match.matches()) {
                 if (pair.contains("{") || pair.contains("}")) throw new IllegalArgumentException("Unsupported query template expression: " + pair);
                 if (!pair.isEmpty()) fixed.add(pair);
@@ -299,6 +372,7 @@ public class MigrationExecution {
             if (matched == null) throw new IllegalArgumentException("Missing mapping for query placeholder: " + variable);
             matched.addProperty("name", key);
             matched.addProperty("location", "QUERY");
+            recordMigrationChange("query_variable_migrated", "Query placeholder " + variable + " mapped to " + key);
         }
         service.addProperty(field, path + (fixed.isEmpty() ? "" : "?" + String.join("&", fixed)));
     }
@@ -307,10 +381,12 @@ public class MigrationExecution {
         for (JsonElement element : parameters) {
             if (!element.isJsonObject()) continue;
             JsonObject parameter = element.getAsJsonObject();
+            JsonObject original = parameter.deepCopy();
             parameter.remove("property");
             if (parameter.has("location") && "PATH".equals(parameter.get("location").getAsString())
                     && (!parameter.has("required") || !parameter.get("required").getAsBoolean())) {
                 log.warn("Marking path parameter {} as required for the Gateway", parameter.get("name"));
+                recordMigrationChange("path_required", "Marked path parameter as required: " + parameter.get("name"));
                 parameter.addProperty("required", true);
             }
             String role = parameter.has("role") ? parameter.get("role").getAsString() : "";
@@ -318,6 +394,7 @@ public class MigrationExecution {
                     || (parameter.has("multiple_values") && parameter.get("multiple_values").getAsBoolean())
                     || !parameter.has("default") || parameter.getAsJsonArray("default").isEmpty())) {
                 log.warn("Exporting parameter {} without FORMAT role: source configuration does not meet Gateway requirements", parameter.get("name"));
+                recordMigrationChange("format_role_removed", "FORMAT role incompatible with Gateway: " + parameter.get("name"));
                 parameter.remove("role");
                 role = "";
             }
@@ -376,6 +453,7 @@ public class MigrationExecution {
                     if (value.isJsonPrimitive() && value.getAsJsonPrimitive().isString()) {
                         if (value.getAsString().isBlank()) {
                             log.warn("Ignoring blank enum value for parameter {}", parameter.get("name"));
+                            recordMigrationChange("enum_value_removed", "Removed blank enum value: " + parameter.get("name"));
                             continue;
                         }
                         JsonObject option = new JsonObject();
@@ -399,6 +477,7 @@ public class MigrationExecution {
                             option.add("value", value.deepCopy());
                             options.add(option);
                             log.warn("Adding a missing default to the allowed values of parameter {}", parameter.get("name"));
+                            recordMigrationChange("enum_default_added", "Added missing default to enum: " + parameter.get("name"));
                         }
                     }
                 }
@@ -406,6 +485,13 @@ public class MigrationExecution {
             }
             if (parameter.has("parameters") && parameter.get("parameters").isJsonArray()) {
                 normalizeParameterArray(parameter.getAsJsonArray("parameters"));
+            }
+            java.util.Set<String> fields = new java.util.LinkedHashSet<>(original.keySet());
+            fields.addAll(parameter.keySet());
+            for (String field : fields) {
+                if (!java.util.Objects.equals(original.get(field), parameter.get(field))) {
+                    recordMigrationChange("parameter_field_changed", "Parameter " + parameter.get("name") + ", field " + field);
+                }
             }
         }
     }
@@ -504,6 +590,9 @@ public class MigrationExecution {
                 Documentation documentation = resolve(first(rd.webService.getDocumentation()), Documentation.class);
                 rd.documentationUri = documentation != null && documentation.getUri() != null && !documentation.getUri().isBlank()
                         ? documentation.getUri() : null;
+                if (documentation != null && documentation.getUri() != null && documentation.getUri().isBlank()) {
+                    recordMigrationChange("documentation_uri_removed", "Removed empty documentation URI from distribution " + distribution.getInstanceId());
+                }
             }
 
             rd.operation = resolve(first(distribution.getSupportedOperation()), Operation.class);
@@ -607,6 +696,7 @@ public class MigrationExecution {
         if (dataProduct == null) return item;
 
         String type = detectDatasetType(dataProduct);
+        recordMigrationChange("dataset_type_selected", "Selected export type " + type);
 
         // Data shared by all types, already resolved and validated
         List<String> categories = categoryNames(dataProduct.getCategory());
@@ -628,7 +718,7 @@ public class MigrationExecution {
             metadata.setCategories(categories);
             metadata.setContactPoints(contactPoints);
             metadata.setCreated(timestamp(dataProduct.getCreated()));
-            metadata.setDescription(first(dataProduct.getDescription()));
+            metadata.setDescription(descriptionOrName(first(dataProduct.getDescription()), first(dataProduct.getTitle())));
             metadata.setKeywords(keywords);
             List<DynamicDatasetExport.PersistentIdentifier> listIdentifiers = new ArrayList<>();
             for (Identifier ide : identifiers) {
@@ -662,7 +752,7 @@ public class MigrationExecution {
                 else {
                     dd.setType("DOWNLOADABLE_FILE");
                     DynamicDatasetExport.DownloadableFile downloadableFile = new DynamicDatasetExport.DownloadableFile();
-                    downloadableFile.setFormat(FileTypeMapper.toMimeType(distribution.getFormat()));
+                    downloadableFile.setFormat(migrationFormat(distribution.getFormat()));
                     downloadableFile.setUrl(first(distribution.getDownloadURL()));
                     dd.setDownloadableFile(downloadableFile);
                 }
@@ -670,7 +760,7 @@ public class MigrationExecution {
                 if ("WEB_SERVICE".equals(dd.getType())) {
                     DynamicDatasetExport.WebService webService1 = new DynamicDatasetExport.WebService();
                     webService1.setContactPoints(rd.webServiceContactEmails);
-                    webService1.setFormat(FileTypeMapper.toMimeType(distribution.getFormat()));
+                    webService1.setFormat(migrationFormat(distribution.getFormat()));
                     webService1.setProvider(rd.providerName);
                     webService1.setType("DYNAMIC");
                     webService1.setDocumentationUri(rd.documentationUri);
@@ -741,7 +831,7 @@ public class MigrationExecution {
             metadata.setCategories(categories);
             metadata.setContactPoints(contactPoints);
             metadata.setCreated(timestamp(dataProduct.getCreated()));
-            metadata.setDescription(first(dataProduct.getDescription()));
+            metadata.setDescription(descriptionOrName(first(dataProduct.getDescription()), first(dataProduct.getTitle())));
             metadata.setKeywords(keywords);
             List<HTTPDatasetExport.PersistentIdentifier> listIdentifiers = new ArrayList<>();
             for (Identifier ide : identifiers) {
@@ -775,7 +865,7 @@ public class MigrationExecution {
                 else {
                     dd.setType("DOWNLOADABLE_FILE");
                     HTTPDatasetExport.DownloadableFile downloadableFile = new HTTPDatasetExport.DownloadableFile();
-                    downloadableFile.setFormat(FileTypeMapper.toMimeType(distribution.getFormat()));
+                    downloadableFile.setFormat(migrationFormat(distribution.getFormat()));
                     downloadableFile.setUrl(first(distribution.getDownloadURL()));
                     dd.setDownloadableFile(downloadableFile);
                 }
@@ -783,7 +873,7 @@ public class MigrationExecution {
                 if ("WEB_SERVICE".equals(dd.getType())) {
                     HTTPDatasetExport.WebService webService1 = new HTTPDatasetExport.WebService();
                     webService1.setContactPoints(rd.webServiceContactEmails);
-                    webService1.setFormat(FileTypeMapper.toMimeType(distribution.getFormat()));
+                    webService1.setFormat(migrationFormat(distribution.getFormat()));
                     webService1.setProvider(rd.providerName);
                     webService1.setType("HTTP");
                     webService1.setDocumentationUri(rd.documentationUri);
@@ -847,7 +937,7 @@ public class MigrationExecution {
             metadata.setCategories(categories);
             metadata.setContactPoints(contactPoints);
             metadata.setCreated(timestamp(dataProduct.getCreated()));
-            metadata.setDescription(first(dataProduct.getDescription()));
+            metadata.setDescription(descriptionOrName(first(dataProduct.getDescription()), first(dataProduct.getTitle())));
             metadata.setKeywords(keywords);
             List<WMSDatasetExport.PersistentIdentifier> listIdentifiers = new ArrayList<>();
             for (Identifier ide : identifiers) {
@@ -871,6 +961,7 @@ public class MigrationExecution {
 
             List<WMSDatasetExport.Distribution> distributions = new ArrayList<>();
             for (ResolvedDistribution rd : resolvedDistributions) {
+                try {
                 Distribution distribution = rd.distribution;
                 WMSDatasetExport.Distribution dd = new WMSDatasetExport.Distribution();
                 dd.setByteSize(parseLong(str(distribution.getByteSize())));
@@ -881,7 +972,7 @@ public class MigrationExecution {
                 else {
                     dd.setType("DOWNLOADABLE_FILE");
                     WMSDatasetExport.DownloadableFile downloadableFile = new WMSDatasetExport.DownloadableFile();
-                    downloadableFile.setFormat(FileTypeMapper.toMimeType(distribution.getFormat()));
+                    downloadableFile.setFormat(migrationFormat(distribution.getFormat()));
                     downloadableFile.setUrl(first(distribution.getDownloadURL()));
                     dd.setDownloadableFile(downloadableFile);
                 }
@@ -889,7 +980,7 @@ public class MigrationExecution {
                 if ("WEB_SERVICE".equals(dd.getType())) {
                     WMSDatasetExport.WebService webService1 = new WMSDatasetExport.WebService();
                     webService1.setContactPoints(rd.webServiceContactEmails);
-                    webService1.setFormat(FileTypeMapper.toMimeType(distribution.getFormat()));
+                    webService1.setFormat(migrationFormat(distribution.getFormat()));
                     webService1.setProvider(rd.providerName);
                     webService1.setType("WMS");
                     webService1.setDocumentationUri(rd.documentationUri);
@@ -960,6 +1051,10 @@ public class MigrationExecution {
                     dd.setWebService(webService1);
                 }
                 distributions.add(dd);
+                } catch (IllegalArgumentException e) {
+                    recordMigrationChange("distribution_removed", "WMS distribution " + rd.distribution.getInstanceId() + ": " + e.getMessage());
+                    log.warn("Skipping WMS distribution {}: {}", rd.distribution.getInstanceId(), e.getMessage());
+                }
             }
             metadata.setDistributions(distributions);
 
@@ -977,7 +1072,7 @@ public class MigrationExecution {
             metadata.setCategories(categories);
             metadata.setContactPoints(contactPoints);
             metadata.setCreated(timestamp(dataProduct.getCreated()));
-            metadata.setDescription(first(dataProduct.getDescription()));
+            metadata.setDescription(descriptionOrName(first(dataProduct.getDescription()), first(dataProduct.getTitle())));
             metadata.setKeywords(keywords);
             List<WMTSDatasetExport.PersistentIdentifier> listIdentifiers = new ArrayList<>();
             for (Identifier ide : identifiers) {
@@ -1001,6 +1096,7 @@ public class MigrationExecution {
 
             List<WMTSDatasetExport.Distribution> distributions = new ArrayList<>();
             for (ResolvedDistribution rd : resolvedDistributions) {
+                try {
                 Distribution distribution = rd.distribution;
                 WMTSDatasetExport.Distribution dd = new WMTSDatasetExport.Distribution();
                 dd.setByteSize(parseLong(str(distribution.getByteSize())));
@@ -1011,7 +1107,7 @@ public class MigrationExecution {
                 else {
                     dd.setType("DOWNLOADABLE_FILE");
                     WMTSDatasetExport.DownloadableFile downloadableFile = new WMTSDatasetExport.DownloadableFile();
-                    downloadableFile.setFormat(FileTypeMapper.toMimeType(distribution.getFormat()));
+                    downloadableFile.setFormat(migrationFormat(distribution.getFormat()));
                     downloadableFile.setUrl(first(distribution.getDownloadURL()));
                     dd.setDownloadableFile(downloadableFile);
                 }
@@ -1019,7 +1115,7 @@ public class MigrationExecution {
                 if ("WEB_SERVICE".equals(dd.getType())) {
                     WMTSDatasetExport.WebService webService1 = new WMTSDatasetExport.WebService();
                     webService1.setContactPoints(rd.webServiceContactEmails);
-                    webService1.setFormat(FileTypeMapper.toMimeType(distribution.getFormat()));
+                    webService1.setFormat(migrationFormat(distribution.getFormat()));
                     webService1.setProvider(rd.providerName);
                     webService1.setType("WMTS");
                     webService1.setDocumentationUri(rd.documentationUri);
@@ -1087,6 +1183,10 @@ public class MigrationExecution {
                     dd.setWebService(webService1);
                 }
                 distributions.add(dd);
+                } catch (IllegalArgumentException e) {
+                    recordMigrationChange("distribution_removed", "WMTS distribution " + rd.distribution.getInstanceId() + ": " + e.getMessage());
+                    log.warn("Skipping WMTS distribution {}: {}", rd.distribution.getInstanceId(), e.getMessage());
+                }
             }
             metadata.setDistributions(distributions);
 
@@ -1104,7 +1204,7 @@ public class MigrationExecution {
             metadata.setCategories(categories);
             metadata.setContactPoints(contactPoints);
             metadata.setCreated(timestamp(dataProduct.getCreated()));
-            metadata.setDescription(first(dataProduct.getDescription()));
+            metadata.setDescription(descriptionOrName(first(dataProduct.getDescription()), first(dataProduct.getTitle())));
             metadata.setKeywords(keywords);
             List<WFSDatasetExport.PersistentIdentifier> listIdentifiers = new ArrayList<>();
             for (Identifier ide : identifiers) {
@@ -1128,6 +1228,7 @@ public class MigrationExecution {
 
             List<WFSDatasetExport.Distribution> distributions = new ArrayList<>();
             for (ResolvedDistribution rd : resolvedDistributions) {
+                try {
                 Distribution distribution = rd.distribution;
                 WFSDatasetExport.Distribution dd = new WFSDatasetExport.Distribution();
                 dd.setByteSize(parseLong(str(distribution.getByteSize())));
@@ -1138,7 +1239,7 @@ public class MigrationExecution {
                 else {
                     dd.setType("DOWNLOADABLE_FILE");
                     WFSDatasetExport.DownloadableFile downloadableFile = new WFSDatasetExport.DownloadableFile();
-                    downloadableFile.setFormat(FileTypeMapper.toMimeType(distribution.getFormat()));
+                    downloadableFile.setFormat(migrationFormat(distribution.getFormat()));
                     downloadableFile.setUrl(first(distribution.getDownloadURL()));
                     dd.setDownloadableFile(downloadableFile);
                 }
@@ -1146,7 +1247,7 @@ public class MigrationExecution {
                 if ("WEB_SERVICE".equals(dd.getType())) {
                     WFSDatasetExport.WebService webService1 = new WFSDatasetExport.WebService();
                     webService1.setContactPoints(rd.webServiceContactEmails);
-                    webService1.setFormat(FileTypeMapper.toMimeType(distribution.getFormat()));
+                    webService1.setFormat(migrationFormat(distribution.getFormat()));
                     webService1.setProvider(rd.providerName);
                     webService1.setType("WFS"); // was "WMS" in the original code
                     webService1.setDocumentationUri(rd.documentationUri);
@@ -1157,6 +1258,7 @@ public class MigrationExecution {
                         webService1.setGetFeatureTemplateUrl(templateSplit[0]);
                     }
                     webService1.setVersion("2.0.0");
+                    recordMigrationChange("wfs_version_set", "WFS version set to 2.0.0");
                     Mapping featureMapping = findMapping(rd.mappings, "typenames", "typename");
                     List<String> featureTypes = mappingChoices(featureMapping, "feature_types");
                     webService1.setFeatureTypes(featureTypes);
@@ -1209,6 +1311,10 @@ public class MigrationExecution {
                     dd.setWebService(webService1);
                 }
                 distributions.add(dd);
+                } catch (IllegalArgumentException e) {
+                    recordMigrationChange("distribution_removed", "WFS distribution " + rd.distribution.getInstanceId() + ": " + e.getMessage());
+                    log.warn("Skipping WFS distribution {}: {}", rd.distribution.getInstanceId(), e.getMessage());
+                }
             }
             metadata.setDistributions(distributions);
 
@@ -1240,7 +1346,7 @@ public class MigrationExecution {
         metadata.setCategories(categoryNames(softwareApplication.getContactPoint()));
         metadata.setContactPoints(contactPointEmails(softwareApplication.getContactPoint()));
         metadata.setCreators(organizationNames(softwareApplication.getContactPoint()));
-        metadata.setDescription(softwareApplication.getDescription());
+        metadata.setDescription(descriptionOrName(softwareApplication.getDescription(), softwareApplication.getName()));
         metadata.setDownloadUrl(softwareApplication.getDownloadURL());
         List<SoftwareApplicationExport.Identifier> identifiers = new ArrayList<>();
         for (Identifier identifier : resolveIdentifiers(softwareApplication.getIdentifier())) {
@@ -1284,7 +1390,7 @@ public class MigrationExecution {
         metadata.setCategories(categoryNames(softwareSourceCode.getContactPoint()));
         metadata.setContactPoints(contactPointEmails(softwareSourceCode.getContactPoint()));
         metadata.setCreators(organizationNames(softwareSourceCode.getContactPoint()));
-        metadata.setDescription(softwareSourceCode.getDescription());
+        metadata.setDescription(descriptionOrName(softwareSourceCode.getDescription(), softwareSourceCode.getName()));
         metadata.setRuntimePlatform(softwareSourceCode.getRuntimePlatform());
         metadata.setSoftwareRequirements(softwareSourceCode.getSoftwareRequirements());
         List<SoftwareSourceCodeExport.Identifier> identifiers = new ArrayList<>();
