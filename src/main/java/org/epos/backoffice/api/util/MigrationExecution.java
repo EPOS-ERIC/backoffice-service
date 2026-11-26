@@ -10,6 +10,8 @@ import metadataapis.*;
 import model.StatusType;
 import org.epos.backoffice.bean.*;
 import org.epos.eposdatamodel.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.ZoneOffset;
 import java.time.LocalDateTime;
@@ -27,6 +29,7 @@ import java.util.stream.Collectors;
 
 public class MigrationExecution {
 
+    private static final Logger log = LoggerFactory.getLogger(MigrationExecution.class);
     public static Gson gson = new Gson();
 
     // =====================================================================
@@ -213,6 +216,13 @@ public class MigrationExecution {
             JsonObject parameter = element.getAsJsonObject();
             parameter.remove("property");
             String role = parameter.has("role") ? parameter.get("role").getAsString() : "";
+            if ("FORMAT".equals(role) && (!parameter.has("read_only") || !parameter.get("read_only").getAsBoolean()
+                    || (parameter.has("multiple_values") && parameter.get("multiple_values").getAsBoolean())
+                    || !parameter.has("default") || parameter.getAsJsonArray("default").isEmpty())) {
+                log.warn("Exporting parameter {} without FORMAT role: source configuration does not meet Gateway requirements", parameter.get("name"));
+                parameter.remove("role");
+                role = "";
+            }
             boolean dynamicCoordinate = List.of("LONGITUDE", "LATITUDE").contains(role);
             boolean coordinate = dynamicCoordinate || List.of("MIN_LON", "MAX_LON", "MIN_LAT", "MAX_LAT").contains(role);
             boolean date = List.of("START_DATE", "END_DATE").contains(role);

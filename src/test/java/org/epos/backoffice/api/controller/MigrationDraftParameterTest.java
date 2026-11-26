@@ -38,16 +38,31 @@ class MigrationDraftParameterTest {
     void translatesLegacyParameterPropertiesAndEnumValues() {
         JsonObject payload = JsonParser.parseString("""
                 {"metadata":{"distributions":[{"web_service":{"parameters":[
-                  {"kind":"STRING","property":"source","role":"FORMAT","enum":["json","xml"]}
+                  {"kind":"STRING","property":"source","role":"FORMAT","read_only":true,"default":["json"],"enum":["json","xml"]}
                 ]}},{"downloadable_file":{"url":"https://example.org"}}]}}
                 """).getAsJsonObject();
         MigrationExecution.normalizeDraftParameters(payload);
         JsonObject expected = JsonParser.parseString("""
                 {"metadata":{"distributions":[{"web_service":{"parameters":[
-                  {"kind":"STRING","role":"FORMAT","enum":[{"value":"json"},{"value":"xml"}]}
+                  {"kind":"STRING","role":"FORMAT","read_only":true,"default":["json"],"enum":[{"value":"json"},{"value":"xml"}]}
                 ]}},{"downloadable_file":{"url":"https://example.org"}}]}}
                 """).getAsJsonObject();
         assertEquals(expected, payload);
+    }
+
+    @Test
+    void keepsEditableFormatParameterWithoutGatewayFormatRole() {
+        JsonObject payload = JsonParser.parseString("""
+                {"metadata":{"distributions":[{"web_service":{"parameters":[
+                  {"name":"format","kind":"STRING","role":"FORMAT","read_only":false,"multiple_values":false,"default":["json"]}
+                ]}}]}}
+                """).getAsJsonObject();
+        MigrationExecution.normalizeDraftParameters(payload);
+        JsonObject parameter = payload.getAsJsonObject("metadata").getAsJsonArray("distributions").get(0)
+                .getAsJsonObject().getAsJsonObject("web_service").getAsJsonArray("parameters").get(0).getAsJsonObject();
+        assertEquals(false, parameter.has("role"));
+        assertEquals(false, parameter.get("read_only").getAsBoolean());
+        assertEquals("json", parameter.getAsJsonArray("default").get(0).getAsString());
     }
 
     @Test
