@@ -19,6 +19,10 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
 import java.math.BigDecimal;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.text.Normalizer;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -211,11 +215,52 @@ public class MigrationExecution {
             JsonObject object = distribution.getAsJsonObject();
             if (!object.has("web_service") || !object.get("web_service").isJsonObject()) continue;
             JsonObject service = object.getAsJsonObject("web_service");
+            normalizeQueryPlaceholders(service);
             for (String field : List.of("parameters", "body_parameters", "get_map_parameters", "get_tile_parameters", "get_feature_info_parameters")) {
                 if (!service.has(field) || !service.get(field).isJsonArray()) continue;
                 normalizeParameterArray(service.getAsJsonArray(field));
             }
         }
+    }
+
+    static void normalizeQueryPlaceholders(JsonObject service) {
+        String field = service.has("get_feature_template_url") && "WFS".equals(service.get("type").getAsString())
+                ? "get_feature_template_url" : "template_url";
+        if (!service.has(field)) return;
+        String template = service.get(field).getAsString();
+        int separator = template.indexOf('?');
+        if (separator < 0) return;
+        String path = template.substring(0, separator);
+        List<String> fixed = new ArrayList<>();
+        Pattern placeholder = Pattern.compile("^\\{([^{}]+)}$");
+        for (String pair : template.substring(separator + 1).split("&", -1)) {
+            int equals = pair.indexOf('=');
+            String value = equals < 0 ? "" : pair.substring(equals + 1);
+            Matcher match = placeholder.matcher(value);
+            if (!match.matches()) {
+                if (pair.contains("{") || pair.contains("}")) throw new IllegalArgumentException("Unsupported query template expression: " + pair);
+                if (!pair.isEmpty()) fixed.add(pair);
+                continue;
+            }
+            String variable = match.group(1);
+            String key = URLDecoder.decode(pair.substring(0, equals), StandardCharsets.UTF_8);
+            if (key.isBlank() || path.contains("{" + variable + "}")) throw new IllegalArgumentException("Cannot migrate query placeholder: " + pair);
+            if (!service.has("parameters") || !service.get("parameters").isJsonArray()) throw new IllegalArgumentException("Missing mapping for query placeholder: " + variable);
+            JsonObject matched = null;
+            for (JsonElement element : service.getAsJsonArray("parameters")) {
+                JsonObject parameter = element.getAsJsonObject();
+                if (parameter.has("name") && variable.equals(parameter.get("name").getAsString())) {
+                    if (matched != null) throw new IllegalArgumentException("Ambiguous query placeholder: " + variable);
+                    matched = parameter;
+                } else if (parameter.has("name") && key.equals(parameter.get("name").getAsString())) {
+                    throw new IllegalArgumentException("Query parameter name already exists: " + key);
+                }
+            }
+            if (matched == null) throw new IllegalArgumentException("Missing mapping for query placeholder: " + variable);
+            matched.addProperty("name", key);
+            matched.addProperty("location", "QUERY");
+        }
+        service.addProperty(field, path + (fixed.isEmpty() ? "" : "?" + String.join("&", fixed)));
     }
 
     private static void normalizeParameterArray(JsonArray parameters) {

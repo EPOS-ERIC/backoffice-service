@@ -11,6 +11,17 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class MigrationDraftParameterTest {
     @Test
+    void movesQueryPlaceholdersToQueryParameters() {
+        JsonObject service = JsonParser.parseString("""
+                {"type":"HTTP","template_url":"https://example.org/api?fixed=1&feature_layer={name}",
+                 "parameters":[{"name":"name","location":"PATH"}]}
+                """).getAsJsonObject();
+        MigrationExecution.normalizeQueryPlaceholders(service);
+        assertEquals("https://example.org/api?fixed=1", service.get("template_url").getAsString());
+        assertEquals("feature_layer", service.getAsJsonArray("parameters").get(0).getAsJsonObject().get("name").getAsString());
+        assertEquals("QUERY", service.getAsJsonArray("parameters").get(0).getAsJsonObject().get("location").getAsString());
+    }
+    @Test
     void addsMissingDefaultsToAllowedValues() {
         JsonObject payload = JsonParser.parseString("""
                 {"metadata":{"distributions":[{"web_service":{"parameters":[
