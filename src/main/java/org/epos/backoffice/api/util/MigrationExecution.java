@@ -353,7 +353,7 @@ public class MigrationExecution {
                     webService1.setProvider(rd.providerName);
                     webService1.setType("DYNAMIC");
                     webService1.setDocumentationUri(rd.documentationUri);
-                    String[] templateSplit = rd.operation.getTemplate().split("\\{?");
+                    String[] templateSplit = rd.operation.getTemplate().split("\\{\\?", 2);
                     if (rd.operation != null) {
                         webService1.setMethod(rd.operation.getMethod());
                         webService1.setTemplateUrl(templateSplit[0]);
@@ -463,7 +463,7 @@ public class MigrationExecution {
                     webService1.setProvider(rd.providerName);
                     webService1.setType("HTTP");
                     webService1.setDocumentationUri(rd.documentationUri);
-                    String[] templateSplit = rd.operation.getTemplate().split("\\{?");
+                    String[] templateSplit = rd.operation.getTemplate().split("\\{\\?", 2);
                     if (rd.operation != null) {
                         webService1.setMethod(rd.operation.getMethod());
                         webService1.setTemplateUrl(templateSplit[0]);
@@ -573,7 +573,7 @@ public class MigrationExecution {
                     webService1.setProvider(rd.providerName);
                     webService1.setType("WMS");
                     webService1.setDocumentationUri(rd.documentationUri);
-                    String[] templateSplit = rd.operation.getTemplate().split("\\{?");
+                    String[] templateSplit = rd.operation.getTemplate().split("\\{\\?", 2);
                     if (rd.operation != null) {
                         webService1.setCapabilitiesUrl(rd.operation.getTemplate());
                         webService1.setMethod(rd.operation.getMethod());
@@ -683,7 +683,7 @@ public class MigrationExecution {
                     webService1.setProvider(rd.providerName);
                     webService1.setType("WMTS");
                     webService1.setDocumentationUri(rd.documentationUri);
-                    String[] templateSplit = rd.operation.getTemplate().split("\\{?");
+                    String[] templateSplit = rd.operation.getTemplate().split("\\{\\?", 2);
                     if (rd.operation != null) {
                         webService1.setCapabilitiesUrl(rd.operation.getTemplate());
                         webService1.setMethod(rd.operation.getMethod());
@@ -794,7 +794,7 @@ public class MigrationExecution {
                     webService1.setProvider(rd.providerName);
                     webService1.setType("WFS"); // was "WMS" in the original code
                     webService1.setDocumentationUri(rd.documentationUri);
-                    String[] templateSplit = rd.operation.getTemplate().split("\\{?");
+                    String[] templateSplit = rd.operation.getTemplate().split("\\{\\?", 2);
                     if (rd.operation != null) {
                         webService1.setMethod(rd.operation.getMethod());
                         webService1.setTemplateUrl(templateSplit[0]);
