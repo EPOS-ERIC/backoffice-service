@@ -11,6 +11,12 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class MigrationDraftParameterTest {
     @Test
+    void convertsSupportedLegacyDateLayouts() {
+        assertEquals("YYYY-MM-DD", MigrationExecution.dateTimeLayout("yyyy-MM-dd"));
+        assertEquals("YYYY-MM-DDThh:mm:ssZ", MigrationExecution.dateTimeLayout("yyyy-MM-dd'T'HH:mm:ss'Z'"));
+        assertThrows(IllegalArgumentException.class, () -> MigrationExecution.dateTimeLayout("yyyy-MM-dd'T'HH:mm:ssXXX"));
+    }
+    @Test
     void selectsWfsChoicesWithoutInventingDefaults() {
         Mapping mapping = new Mapping();
         mapping.setParamValue(List.of("layer-a", "layer-b", "layer-a"));

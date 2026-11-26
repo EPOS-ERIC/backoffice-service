@@ -105,6 +105,16 @@ public class MigrationExecution {
         return variable != null && template.contains("{" + variable + "}");
     }
 
+    static String dateTimeLayout(String pattern) {
+        return switch (pattern.trim()) {
+            case "yyyy-MM-dd", "YYYY-MM-DD" -> "YYYY-MM-DD";
+            case "yyyy-MM-dd'T'HH:mm:ss", "yyyy-MM-ddTHH:mm:ss", "YYYY-MM-DDThh:mm:ss" -> "YYYY-MM-DDThh:mm:ss";
+            case "yyyy-MM-dd HH:mm:ss", "YYYY-MM-DD hh:mm:ss" -> "YYYY-MM-DD hh:mm:ss";
+            case "yyyy-MM-dd'T'HH:mm:ss'Z'", "YYYY-MM-DDThh:mm:ssZ" -> "YYYY-MM-DDThh:mm:ssZ";
+            default -> throw new IllegalArgumentException("Unsupported legacy DATETIME pattern: " + pattern);
+        };
+    }
+
     private static Mapping findMapping(List<Mapping> mappings, String... names) {
         for (Mapping mapping : mappings) {
             for (String name : names) {
@@ -208,7 +218,12 @@ public class MigrationExecution {
                 parameter.addProperty("kind", "DATETIME");
                 parameter.remove("multiple_values");
                 if (parameter.has("pattern")) {
-                    throw new IllegalArgumentException("DATETIME pattern requires conversion to a Gateway layout: " + parameter.get("name"));
+                    String pattern = parameter.remove("pattern").getAsString();
+                    try {
+                        parameter.addProperty("layout", dateTimeLayout(pattern));
+                    } catch (IllegalArgumentException e) {
+                        throw new IllegalArgumentException("DATETIME parameter " + parameter.get("name") + ": " + e.getMessage(), e);
+                    }
                 }
                 if (parameter.has("enum") && !parameter.getAsJsonArray("enum").isEmpty()) {
                     throw new IllegalArgumentException("DATETIME parameter cannot represent enum values: " + parameter.get("name"));
