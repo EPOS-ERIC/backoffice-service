@@ -11,6 +11,12 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class MigrationDraftParameterTest {
     @Test
+    void normalizesDateDefaultsWithoutLosingExistingOffsets() {
+        assertEquals("2010-01-01T00:00:00Z", MigrationExecution.dateTimeDefault("2010-01-01T00:00:00"));
+        assertEquals("2010-01-01T00:00:00+02:00", MigrationExecution.dateTimeDefault("2010-01-01T00:00:00+02:00"));
+        assertThrows(IllegalArgumentException.class, () -> MigrationExecution.dateTimeDefault("invalid"));
+    }
+    @Test
     void convertsSupportedLegacyDateLayouts() {
         assertEquals("YYYY-MM-DD", MigrationExecution.dateTimeLayout("yyyy-MM-dd"));
         assertEquals("YYYY-MM-DDThh:mm:ssZ", MigrationExecution.dateTimeLayout("yyyy-MM-dd'T'HH:mm:ss'Z'"));

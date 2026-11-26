@@ -13,6 +13,8 @@ import org.epos.eposdatamodel.*;
 
 import java.time.ZoneOffset;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeParseException;
 import java.math.BigDecimal;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -113,6 +115,20 @@ public class MigrationExecution {
             case "yyyy-MM-dd'T'HH:mm:ss'Z'", "YYYY-MM-DDThh:mm:ssZ" -> "YYYY-MM-DDThh:mm:ssZ";
             default -> throw new IllegalArgumentException("Unsupported legacy DATETIME pattern: " + pattern);
         };
+    }
+
+    static String dateTimeDefault(String value) {
+        try {
+            return OffsetDateTime.parse(value, DateTimeFormatter.ISO_OFFSET_DATE_TIME)
+                    .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+        } catch (DateTimeParseException ignored) {
+            try {
+                return LocalDateTime.parse(value, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                        .atOffset(ZoneOffset.UTC).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+            } catch (DateTimeParseException e) {
+                throw new IllegalArgumentException("Invalid DATETIME default: " + value, e);
+            }
+        }
     }
 
     private static Mapping findMapping(List<Mapping> mappings, String... names) {
@@ -232,7 +248,7 @@ public class MigrationExecution {
                 if (parameter.has("default")) {
                     JsonArray values = parameter.getAsJsonArray("default");
                     if (values.size() != 1) throw new IllegalArgumentException("DATETIME default must contain one value: " + parameter.get("name"));
-                    parameter.add("default", values.get(0).deepCopy());
+                    parameter.addProperty("default", dateTimeDefault(values.get(0).getAsString()));
                 }
             }
             if (parameter.has("enum") && parameter.get("enum").isJsonArray()) {
