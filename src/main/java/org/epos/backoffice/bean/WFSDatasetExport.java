@@ -322,7 +322,7 @@ public class WFSDatasetExport implements Serializable {
 
         @JsonProperty("result_limit")
         @SerializedName("result_limit")
-        private Integer resultLimit;
+        private Long resultLimit;
 
         @JsonProperty("result_limit_editable")
         @SerializedName("result_limit_editable")
@@ -391,8 +391,8 @@ public class WFSDatasetExport implements Serializable {
         public String getDefaultOutputFormat() { return defaultOutputFormat; }
         public void setDefaultOutputFormat(String defaultOutputFormat) { this.defaultOutputFormat = defaultOutputFormat; }
 
-        public Integer getResultLimit() { return resultLimit; }
-        public void setResultLimit(Integer resultLimit) { this.resultLimit = resultLimit; }
+        public Long getResultLimit() { return resultLimit; }
+        public void setResultLimit(Long resultLimit) { this.resultLimit = resultLimit; }
 
         public Boolean getResultLimitEditable() { return resultLimitEditable; }
         public void setResultLimitEditable(Boolean resultLimitEditable) { this.resultLimitEditable = resultLimitEditable; }

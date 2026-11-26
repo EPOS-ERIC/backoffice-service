@@ -485,7 +485,7 @@ public class WMTSDatasetExport implements Serializable {
         /** Struttura degli elementi non nota: String o Map, come per defaultStyle. */
         @JsonProperty("styles")
         @SerializedName("styles")
-        private List<Object> styles;
+        private List<String> styles;
 
         public Layer() {
         }
@@ -499,8 +499,8 @@ public class WMTSDatasetExport implements Serializable {
         public Object getDefaultStyle() { return defaultStyle; }
         public void setDefaultStyle(Object defaultStyle) { this.defaultStyle = defaultStyle; }
 
-        public List<Object> getStyles() { return styles; }
-        public void setStyles(List<Object> styles) { this.styles = styles; }
+        public List<String> getStyles() { return styles; }
+        public void setStyles(List<String> styles) { this.styles = styles; }
     }
 
     // ------------------------------------------------------------------
