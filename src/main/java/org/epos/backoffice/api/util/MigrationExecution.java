@@ -16,6 +16,7 @@ import org.slf4j.LoggerFactory;
 import java.time.ZoneOffset;
 import java.time.LocalDateTime;
 import java.time.LocalDate;
+import java.time.Year;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
 import java.math.BigDecimal;
@@ -126,6 +127,11 @@ public class MigrationExecution {
     static String dateTimeLayout(String pattern) {
         return switch (pattern.trim()) {
             case "yyyy-MM-dd", "YYYY-MM-DD" -> "YYYY-MM-DD";
+            case "YYYYMMDD" -> "YYYYMMDD";
+            case "YYYY" -> "YYYY";
+            case "YYYY-MM-DD HH:mm" -> "YYYY-MM-DD hh:mm";
+            case "YYYY-MM-DDTHH:MM:SS" -> "YYYY-MM-DDThh:mm:ss";
+            case "YYYY-MM-DDThh:mm:ss.SSSZ" -> "YYYY-MM-DDThh:mm:ss.SSSZ";
             case "yyyy-MM-dd'T'HH:mm:ss", "yyyy-MM-ddTHH:mm:ss", "YYYY-MM-DDThh:mm:ss" -> "YYYY-MM-DDThh:mm:ss";
             case "yyyy-MM-dd HH:mm:ss", "YYYY-MM-DD hh:mm:ss" -> "YYYY-MM-DD hh:mm:ss";
             case "yyyy-MM-dd'T'HH:mm:ss'Z'", "YYYY-MM-DDThh:mm:ssZ", "YYYY-MM-DDTHH:MM:SSZ" -> "YYYY-MM-DDThh:mm:ssZ";
@@ -146,7 +152,14 @@ public class MigrationExecution {
                     return LocalDate.parse(value, DateTimeFormatter.ISO_LOCAL_DATE)
                             .atStartOfDay().atOffset(ZoneOffset.UTC).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
                 } catch (DateTimeParseException invalidDate) {
-                    throw new IllegalArgumentException("Invalid DATETIME default: " + value, invalidDate);
+                    try {
+                        LocalDate date = value.matches("[0-9]{4}")
+                                ? Year.parse(value).atDay(1)
+                                : LocalDate.parse(value, DateTimeFormatter.BASIC_ISO_DATE);
+                        return date.atStartOfDay().atOffset(ZoneOffset.UTC).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+                    } catch (DateTimeParseException invalidCompactDate) {
+                        throw new IllegalArgumentException("Invalid DATETIME default: " + value, invalidCompactDate);
+                    }
                 }
             }
         }
@@ -231,9 +244,33 @@ public class MigrationExecution {
         int separator = template.indexOf('?');
         if (separator < 0) return;
         String path = template.substring(0, separator);
+        Matcher continuation = Pattern.compile("\\{&([^{}]+)}").matcher(template.substring(separator + 1));
+        StringBuffer query = new StringBuffer();
+        while (continuation.find()) {
+            for (String variable : continuation.group(1).split(",", -1)) {
+                if (!variable.matches("[A-Za-z0-9_.%-]+") || path.contains("{" + variable + "}")) {
+                    throw new IllegalArgumentException("Unsupported query template variable: " + variable);
+                }
+                if (!service.has("parameters") || !service.get("parameters").isJsonArray()) {
+                    throw new IllegalArgumentException("Missing mapping for query placeholder: " + variable);
+                }
+                JsonObject found = null;
+                for (JsonElement element : service.getAsJsonArray("parameters")) {
+                    JsonObject parameter = element.getAsJsonObject();
+                    if (parameter.has("name") && variable.equals(parameter.get("name").getAsString())) {
+                        if (found != null) throw new IllegalArgumentException("Ambiguous query placeholder: " + variable);
+                        found = parameter;
+                    }
+                }
+                if (found == null) throw new IllegalArgumentException("Missing mapping for query placeholder: " + variable);
+                found.addProperty("location", "QUERY");
+            }
+            continuation.appendReplacement(query, "");
+        }
+        continuation.appendTail(query);
         List<String> fixed = new ArrayList<>();
         Pattern placeholder = Pattern.compile("^\\{([^{}]+)}$");
-        for (String pair : template.substring(separator + 1).split("&", -1)) {
+        for (String pair : query.toString().split("&", -1)) {
             int equals = pair.indexOf('=');
             String value = equals < 0 ? "" : pair.substring(equals + 1);
             Matcher match = placeholder.matcher(value);
@@ -1116,13 +1153,7 @@ public class MigrationExecution {
                         webService1.setTemplateUrl(templateSplit[0]);
                         webService1.setGetFeatureTemplateUrl(templateSplit[0]);
                     }
-                    Mapping versionMapping = findMapping(rd.mappings, "version");
-                    List<String> versions = mappingChoices(versionMapping, "version");
-                    String version = mappingDefault(versionMapping, versions, "version");
-                    if (!List.of("1.1.0", "2.0.0").contains(version)) {
-                        throw new IllegalArgumentException("Unsupported WFS version: " + version);
-                    }
-                    webService1.setVersion(version);
+                    webService1.setVersion("2.0.0");
                     Mapping featureMapping = findMapping(rd.mappings, "typenames", "typename");
                     List<String> featureTypes = mappingChoices(featureMapping, "feature_types");
                     webService1.setFeatureTypes(featureTypes);

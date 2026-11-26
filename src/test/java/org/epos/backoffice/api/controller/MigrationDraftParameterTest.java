@@ -11,6 +11,19 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class MigrationDraftParameterTest {
     @Test
+    void preservesFixedQueryBeforeRfc6570Continuation() {
+        JsonObject service = JsonParser.parseString("""
+                {"type":"HTTP","template_url":"https://example.org/api?pt=MODEL{&start,end}",
+                 "parameters":[{"name":"start","location":"QUERY"},{"name":"end","location":"QUERY"}]}
+                """).getAsJsonObject();
+        MigrationExecution.normalizeQueryPlaceholders(service);
+        assertEquals("https://example.org/api?pt=MODEL", service.get("template_url").getAsString());
+        assertEquals("QUERY", service.getAsJsonArray("parameters").get(0).getAsJsonObject().get("location").getAsString());
+        assertThrows(IllegalArgumentException.class, () -> MigrationExecution.normalizeQueryPlaceholders(JsonParser.parseString("""
+                {"type":"HTTP","template_url":"https://example.org/?pt=MODEL{&missing}","parameters":[]}
+                """).getAsJsonObject()));
+    }
+    @Test
     void fixesLegacyPathDatesAndBlankEnumValues() {
         JsonObject payload = JsonParser.parseString("""
                 {"metadata":{"distributions":[{"web_service":{"parameters":[
@@ -67,6 +80,8 @@ class MigrationDraftParameterTest {
     void normalizesDateDefaultsWithoutLosingExistingOffsets() {
         assertEquals("2010-01-01T00:00:00Z", MigrationExecution.dateTimeDefault("2010-01-01T00:00:00"));
         assertEquals("2010-10-01T00:00:00Z", MigrationExecution.dateTimeDefault("2010-10-01"));
+        assertEquals("1982-10-01T00:00:00Z", MigrationExecution.dateTimeDefault("19821001"));
+        assertEquals("2010-01-01T00:00:00Z", MigrationExecution.dateTimeDefault("2010"));
         assertEquals("2010-01-01T00:00:00+02:00", MigrationExecution.dateTimeDefault("2010-01-01T00:00:00+02:00"));
         assertThrows(IllegalArgumentException.class, () -> MigrationExecution.dateTimeDefault("invalid"));
     }
@@ -75,6 +90,11 @@ class MigrationDraftParameterTest {
         assertEquals("YYYY-MM-DD", MigrationExecution.dateTimeLayout("yyyy-MM-dd"));
         assertEquals("YYYY-MM-DDThh:mm:ssZ", MigrationExecution.dateTimeLayout("yyyy-MM-dd'T'HH:mm:ss'Z'"));
         assertEquals("YYYY-MM-DDThh:mm:ssZ", MigrationExecution.dateTimeLayout("YYYY-MM-DDTHH:MM:SSZ"));
+        assertEquals("YYYY-MM-DDThh:mm:ss.SSSZ", MigrationExecution.dateTimeLayout("YYYY-MM-DDThh:mm:ss.SSSZ"));
+        assertEquals("YYYYMMDD", MigrationExecution.dateTimeLayout("YYYYMMDD"));
+        assertEquals("YYYY", MigrationExecution.dateTimeLayout("YYYY"));
+        assertEquals("YYYY-MM-DD hh:mm", MigrationExecution.dateTimeLayout("YYYY-MM-DD HH:mm"));
+        assertEquals("YYYY-MM-DDThh:mm:ss", MigrationExecution.dateTimeLayout("YYYY-MM-DDTHH:MM:SS"));
         assertThrows(IllegalArgumentException.class, () -> MigrationExecution.dateTimeLayout("yyyy-MM-dd'T'HH:mm:ssXXX"));
     }
     @Test
