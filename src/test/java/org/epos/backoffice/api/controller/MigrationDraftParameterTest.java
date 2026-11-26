@@ -13,6 +13,7 @@ class MigrationDraftParameterTest {
     @Test
     void normalizesDateDefaultsWithoutLosingExistingOffsets() {
         assertEquals("2010-01-01T00:00:00Z", MigrationExecution.dateTimeDefault("2010-01-01T00:00:00"));
+        assertEquals("2010-10-01T00:00:00Z", MigrationExecution.dateTimeDefault("2010-10-01"));
         assertEquals("2010-01-01T00:00:00+02:00", MigrationExecution.dateTimeDefault("2010-01-01T00:00:00+02:00"));
         assertThrows(IllegalArgumentException.class, () -> MigrationExecution.dateTimeDefault("invalid"));
     }

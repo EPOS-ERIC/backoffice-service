@@ -13,6 +13,7 @@ import org.epos.eposdatamodel.*;
 
 import java.time.ZoneOffset;
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
 import java.math.BigDecimal;
@@ -126,7 +127,12 @@ public class MigrationExecution {
                 return LocalDateTime.parse(value, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
                         .atOffset(ZoneOffset.UTC).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
             } catch (DateTimeParseException e) {
-                throw new IllegalArgumentException("Invalid DATETIME default: " + value, e);
+                try {
+                    return LocalDate.parse(value, DateTimeFormatter.ISO_LOCAL_DATE)
+                            .atStartOfDay().atOffset(ZoneOffset.UTC).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+                } catch (DateTimeParseException invalidDate) {
+                    throw new IllegalArgumentException("Invalid DATETIME default: " + value, invalidDate);
+                }
             }
         }
     }
