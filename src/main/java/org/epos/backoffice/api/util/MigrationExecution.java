@@ -19,9 +19,9 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
 import java.math.BigDecimal;
+import java.text.Normalizer;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -92,12 +92,20 @@ public class MigrationExecution {
         }
     }
 
-    private static List<String> splitKeywords(String keywords) {
+    static List<String> splitKeywords(String keywords) {
         if (keywords == null || keywords.isBlank()) return new ArrayList<>();
-        return Arrays.stream(keywords.replace("/"," ").split(","))
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .collect(Collectors.toList());
+        List<String> result = new ArrayList<>();
+        for (String keyword : keywords.split(",")) {
+            String original = keyword.trim();
+            if (original.isEmpty()) continue;
+            String normalized = Normalizer.normalize(original, Normalizer.Form.NFKD)
+                    .replaceAll("\\p{M}+", "")
+                    .replaceAll("[^A-Za-z0-9 _:-]+", " ")
+                    .replaceAll(" +", " ").trim();
+            if (!normalized.equals(original)) log.warn("Normalizing a keyword for the Gateway");
+            if (!normalized.isEmpty()) result.add(normalized);
+        }
+        return result;
     }
 
     private static String templateBase(Operation operation) {

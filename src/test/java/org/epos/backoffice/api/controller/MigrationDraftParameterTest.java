@@ -11,6 +11,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class MigrationDraftParameterTest {
     @Test
+    void normalizesLegacyKeywordsForGateway() {
+        assertEquals(List.of("geologia attivita", "rock soil", "abc-123:test_ok"),
+                MigrationExecution.splitKeywords("geologia/attività, rock & soil, abc-123:test_ok, !!!"));
+    }
+    @Test
     void normalizesDateDefaultsWithoutLosingExistingOffsets() {
         assertEquals("2010-01-01T00:00:00Z", MigrationExecution.dateTimeDefault("2010-01-01T00:00:00"));
         assertEquals("2010-10-01T00:00:00Z", MigrationExecution.dateTimeDefault("2010-10-01"));
