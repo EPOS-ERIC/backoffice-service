@@ -26,6 +26,7 @@ class MigrationDraftParameterTest {
     void convertsSupportedLegacyDateLayouts() {
         assertEquals("YYYY-MM-DD", MigrationExecution.dateTimeLayout("yyyy-MM-dd"));
         assertEquals("YYYY-MM-DDThh:mm:ssZ", MigrationExecution.dateTimeLayout("yyyy-MM-dd'T'HH:mm:ss'Z'"));
+        assertEquals("YYYY-MM-DDThh:mm:ssZ", MigrationExecution.dateTimeLayout("YYYY-MM-DDTHH:MM:SSZ"));
         assertThrows(IllegalArgumentException.class, () -> MigrationExecution.dateTimeLayout("yyyy-MM-dd'T'HH:mm:ssXXX"));
     }
     @Test

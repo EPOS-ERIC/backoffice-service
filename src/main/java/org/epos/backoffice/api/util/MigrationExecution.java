@@ -124,7 +124,7 @@ public class MigrationExecution {
             case "yyyy-MM-dd", "YYYY-MM-DD" -> "YYYY-MM-DD";
             case "yyyy-MM-dd'T'HH:mm:ss", "yyyy-MM-ddTHH:mm:ss", "YYYY-MM-DDThh:mm:ss" -> "YYYY-MM-DDThh:mm:ss";
             case "yyyy-MM-dd HH:mm:ss", "YYYY-MM-DD hh:mm:ss" -> "YYYY-MM-DD hh:mm:ss";
-            case "yyyy-MM-dd'T'HH:mm:ss'Z'", "YYYY-MM-DDThh:mm:ssZ" -> "YYYY-MM-DDThh:mm:ssZ";
+            case "yyyy-MM-dd'T'HH:mm:ss'Z'", "YYYY-MM-DDThh:mm:ssZ", "YYYY-MM-DDTHH:MM:SSZ" -> "YYYY-MM-DDThh:mm:ssZ";
             default -> throw new IllegalArgumentException("Unsupported legacy DATETIME pattern: " + pattern);
         };
     }
