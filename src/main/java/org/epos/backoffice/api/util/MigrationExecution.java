@@ -247,23 +247,26 @@ public class MigrationExecution {
         Matcher continuation = Pattern.compile("\\{&([^{}]+)}").matcher(template.substring(separator + 1));
         StringBuffer query = new StringBuffer();
         while (continuation.find()) {
-            for (String variable : continuation.group(1).split(",", -1)) {
+            for (String rawVariable : continuation.group(1).split(",", -1)) {
+                String variable = rawVariable.trim();
                 if (!variable.matches("[A-Za-z0-9_.%-]+") || path.contains("{" + variable + "}")) {
                     throw new IllegalArgumentException("Unsupported query template variable: " + variable);
                 }
-                if (!service.has("parameters") || !service.get("parameters").isJsonArray()) {
-                    throw new IllegalArgumentException("Missing mapping for query placeholder: " + variable);
-                }
                 JsonObject found = null;
-                for (JsonElement element : service.getAsJsonArray("parameters")) {
-                    JsonObject parameter = element.getAsJsonObject();
-                    if (parameter.has("name") && variable.equals(parameter.get("name").getAsString())) {
-                        if (found != null) throw new IllegalArgumentException("Ambiguous query placeholder: " + variable);
-                        found = parameter;
+                if (service.has("parameters") && service.get("parameters").isJsonArray()) {
+                    for (JsonElement element : service.getAsJsonArray("parameters")) {
+                        JsonObject parameter = element.getAsJsonObject();
+                        if (parameter.has("name") && variable.equals(parameter.get("name").getAsString())) {
+                            if (found != null) throw new IllegalArgumentException("Ambiguous query placeholder: " + variable);
+                            found = parameter;
+                        }
                     }
                 }
-                if (found == null) throw new IllegalArgumentException("Missing mapping for query placeholder: " + variable);
-                found.addProperty("location", "QUERY");
+                if (found == null) {
+                    log.warn("Omitting undefined optional query template variable {}", variable);
+                } else {
+                    found.addProperty("location", "QUERY");
+                }
             }
             continuation.appendReplacement(query, "");
         }

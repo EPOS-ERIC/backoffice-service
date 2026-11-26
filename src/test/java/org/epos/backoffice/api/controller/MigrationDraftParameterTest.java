@@ -13,15 +13,17 @@ class MigrationDraftParameterTest {
     @Test
     void preservesFixedQueryBeforeRfc6570Continuation() {
         JsonObject service = JsonParser.parseString("""
-                {"type":"HTTP","template_url":"https://example.org/api?pt=MODEL{&start,end}",
+                {"type":"HTTP","template_url":"https://example.org/api?pt=MODEL{&start, end}",
                  "parameters":[{"name":"start","location":"QUERY"},{"name":"end","location":"QUERY"}]}
                 """).getAsJsonObject();
         MigrationExecution.normalizeQueryPlaceholders(service);
         assertEquals("https://example.org/api?pt=MODEL", service.get("template_url").getAsString());
         assertEquals("QUERY", service.getAsJsonArray("parameters").get(0).getAsJsonObject().get("location").getAsString());
-        assertThrows(IllegalArgumentException.class, () -> MigrationExecution.normalizeQueryPlaceholders(JsonParser.parseString("""
+        JsonObject undefined = JsonParser.parseString("""
                 {"type":"HTTP","template_url":"https://example.org/?pt=MODEL{&missing}","parameters":[]}
-                """).getAsJsonObject()));
+                """).getAsJsonObject();
+        MigrationExecution.normalizeQueryPlaceholders(undefined);
+        assertEquals("https://example.org/?pt=MODEL", undefined.get("template_url").getAsString());
     }
     @Test
     void fixesLegacyPathDatesAndBlankEnumValues() {
