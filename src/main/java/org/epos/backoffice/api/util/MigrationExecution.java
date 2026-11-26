@@ -286,6 +286,23 @@ public class MigrationExecution {
                         options.add(value.deepCopy());
                     }
                 }
+                if (!options.isEmpty() && parameter.has("default") && parameter.get("default").isJsonArray()) {
+                    for (JsonElement value : parameter.getAsJsonArray("default")) {
+                        boolean present = false;
+                        for (JsonElement option : options) {
+                            if (option.isJsonObject() && value.equals(option.getAsJsonObject().get("value"))) {
+                                present = true;
+                                break;
+                            }
+                        }
+                        if (!present) {
+                            JsonObject option = new JsonObject();
+                            option.add("value", value.deepCopy());
+                            options.add(option);
+                            log.warn("Adding a missing default to the allowed values of parameter {}", parameter.get("name"));
+                        }
+                    }
+                }
                 parameter.add("enum", options);
             }
             if (parameter.has("parameters") && parameter.get("parameters").isJsonArray()) {

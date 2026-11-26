@@ -11,6 +11,23 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class MigrationDraftParameterTest {
     @Test
+    void addsMissingDefaultsToAllowedValues() {
+        JsonObject payload = JsonParser.parseString("""
+                {"metadata":{"distributions":[{"web_service":{"parameters":[
+                  {"name":"format","kind":"STRING","default":["script"],"enum":["json","csv"]},
+                  {"name":"west","role":"MIN_LON","multiple_values":false,"default":["2"],"enum":["1"]}
+                ]}}]}}
+                """).getAsJsonObject();
+        MigrationExecution.normalizeDraftParameters(payload);
+        JsonObject expected = JsonParser.parseString("""
+                {"metadata":{"distributions":[{"web_service":{"parameters":[
+                  {"name":"format","kind":"STRING","default":["script"],"enum":[{"value":"json"},{"value":"csv"},{"value":"script"}]},
+                  {"name":"west","role":"MIN_LON","kind":"FLOAT","multiple_values":false,"default":[2],"enum":[{"value":1},{"value":2}]}
+                ]}}]}}
+                """).getAsJsonObject();
+        assertEquals(expected, payload);
+    }
+    @Test
     void normalizesLegacyKeywordsForGateway() {
         assertEquals(List.of("geologia attivita", "rock soil", "abc-123:test_ok"),
                 MigrationExecution.splitKeywords("geologia/attività, rock & soil, abc-123:test_ok, !!!"));
