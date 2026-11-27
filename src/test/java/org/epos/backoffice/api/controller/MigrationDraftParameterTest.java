@@ -4,6 +4,8 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.junit.jupiter.api.Test;
 import org.epos.eposdatamodel.Mapping;
+import org.epos.eposdatamodel.Category;
+import org.epos.eposdatamodel.LinkedEntity;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -11,7 +13,58 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class MigrationDraftParameterTest {
     @Test
-    void recordsFallbackAndOmitsInvalidWmsDistribution() {
+    void buildsCapabilitiesUrlFromLegacyMapTemplate() {
+        String legacy = "https://geo.example.org/ows?service=WMS&version=1.3.0&request=GetMap{&layers,width}&bbox={minlat, maxlat}&token=public";
+        assertEquals("https://geo.example.org/ows?version=1.3.0&token=public&service=WMS&request=GetCapabilities",
+                MigrationExecution.normalizeCapabilitiesUrl(legacy, "WMS"));
+        assertEquals("https://geo.example.org/tiles?service=WMTS&request=GetCapabilities",
+                MigrationExecution.normalizeCapabilitiesUrl("https://geo.example.org/tiles{?layer,format}", "WMTS"));
+        assertThrows(IllegalArgumentException.class, () -> MigrationExecution.normalizeCapabilitiesUrl("not-a-url", "WMS"));
+    }
+
+    @Test
+    void normalizesCapabilitiesInExportAndRecordsChange() {
+        JsonObject payload = JsonParser.parseString("""
+                {"metadata":{"distributions":[{"title":"Map","web_service":{
+                  "type":"WMS",
+                  "template_url":"https://geo.example.org/ows?service=WMS&request=GetMap{&layers}&bbox={minlat,maxlat}",
+                  "capabilities_url":"https://geo.example.org/ows?service=WMS&request=GetMap{&layers}&bbox={minlat,maxlat}",
+                  "parameters":[]}}]}}
+                """).getAsJsonObject();
+        MigrationExecution.beginMigrationDebug();
+        try {
+            MigrationExecution.normalizeDraftParameters(payload);
+            JsonObject service = payload.getAsJsonObject("metadata").getAsJsonArray("distributions").get(0)
+                    .getAsJsonObject().getAsJsonObject("web_service");
+            assertEquals("https://geo.example.org/ows?service=WMS&request=GetCapabilities", service.get("capabilities_url").getAsString());
+            var events = MigrationExecution.endMigrationDebug();
+            assertEquals(true, java.util.stream.StreamSupport.stream(events.spliterator(), false)
+                    .anyMatch(event -> event.getAsJsonObject().get("action").getAsString().equals("capabilities_url_normalized")));
+        } finally {
+            MigrationExecution.endMigrationDebug();
+        }
+    }
+    @Test
+    void recordsCategoryAndSchemeIdentitiesIncludingUnresolvedReferences() {
+        MigrationExecution.beginMigrationDebug();
+        try {
+            LinkedEntity ref = new LinkedEntity().instanceId("category-id");
+            Category category = new Category();
+            category.setName("Same name");
+            category.setInScheme(new LinkedEntity().instanceId("scheme-id"));
+            MigrationExecution.recordSourceCategory(ref, category);
+            MigrationExecution.recordSourceCategory(new LinkedEntity().instanceId("missing"), null);
+            var events = MigrationExecution.endMigrationDebug();
+            assertEquals("category-id", events.get(0).getAsJsonObject().get("source_id").getAsString());
+            assertEquals("scheme-id", events.get(0).getAsJsonObject().get("scheme_id").getAsString());
+            assertEquals("missing", events.get(1).getAsJsonObject().get("source_id").getAsString());
+            assertEquals(false, events.get(1).getAsJsonObject().has("scheme_id"));
+        } finally {
+            MigrationExecution.endMigrationDebug();
+        }
+    }
+    @Test
+    void recordsFallbackAndRetainsIncompleteWmsDistributionForReview() {
         MigrationExecution.beginMigrationDebug();
         JsonObject payload = JsonParser.parseString("""
                 {"metadata":{"distributions":[
@@ -22,10 +75,14 @@ class MigrationDraftParameterTest {
         try {
             assertEquals("Name", MigrationExecution.descriptionOrName("", "Name"));
             MigrationExecution.normalizeDraftParameters(payload);
-            assertEquals(1, payload.getAsJsonObject("metadata").getAsJsonArray("distributions").size());
+            assertEquals(2, payload.getAsJsonObject("metadata").getAsJsonArray("distributions").size());
+            JsonObject retained = payload.getAsJsonObject("metadata").getAsJsonArray("distributions").get(0)
+                    .getAsJsonObject().getAsJsonObject("web_service");
+            assertEquals("HTTP", retained.get("type").getAsString());
+            assertEquals("WMS", retained.getAsJsonObject("_review_original_service").get("type").getAsString());
             var events = MigrationExecution.endMigrationDebug();
             assertEquals("description_fallback", events.get(0).getAsJsonObject().get("action").getAsString());
-            assertEquals("distribution_removed", events.get(2).getAsJsonObject().get("action").getAsString());
+            assertEquals("distribution_retained_for_review", events.get(2).getAsJsonObject().get("action").getAsString());
         } finally {
             MigrationExecution.endMigrationDebug();
         }

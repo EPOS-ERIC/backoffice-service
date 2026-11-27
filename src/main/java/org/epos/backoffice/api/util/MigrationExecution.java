@@ -21,6 +21,7 @@ import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
 import java.math.BigDecimal;
 import java.net.URLDecoder;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -287,6 +288,17 @@ public class MigrationExecution {
             try {
                 recordMigrationChange("web_service_checked", "Checked web service for distribution " + object.get("title"));
                 normalizeQueryPlaceholders(service);
+                if (service.has("type") && service.has("capabilities_url")) {
+                    String serviceType = service.get("type").getAsString();
+                    if ("WMS".equals(serviceType) || "WMTS".equals(serviceType)) {
+                        String originalUrl = service.get("capabilities_url").getAsString();
+                        String capabilitiesUrl = normalizeCapabilitiesUrl(originalUrl, serviceType);
+                        if (!originalUrl.equals(capabilitiesUrl)) {
+                            recordMigrationChange("capabilities_url_normalized", "Converted " + serviceType + " operation URL to GetCapabilities");
+                            service.addProperty("capabilities_url", capabilitiesUrl);
+                        }
+                    }
+                }
                 for (String field : List.of("parameters", "body_parameters", "get_map_parameters", "get_tile_parameters", "get_feature_info_parameters")) {
                     if (!service.has(field) || !service.get(field).isJsonArray()) continue;
                     normalizeParameterArray(service.getAsJsonArray(field));
@@ -295,11 +307,59 @@ public class MigrationExecution {
             } catch (IllegalArgumentException e) {
                 String kind = service.has("type") ? service.get("type").getAsString() : "";
                 if (!List.of("WMS", "WMTS", "WFS").contains(kind)) throw e;
-                recordMigrationChange("distribution_removed", kind + " distribution " + object.get("title") + ": " + e.getMessage());
-                log.warn("Skipping {} distribution {}: {}", kind, object.get("title"), e.getMessage());
+                retainLegacyGeographicDistribution(service, kind, e);
+                retained.add(distribution);
             }
         }
         metadata.add("distributions", retained);
+    }
+
+    static void retainLegacyGeographicDistribution(JsonObject service, String kind, RuntimeException cause) {
+        JsonObject raw = service.deepCopy();
+        recordMigrationChange("distribution_retained_for_review",
+                kind + " distribution retained for manual completion: " + cause.getMessage());
+        log.warn("Retaining {} distribution for manual completion: {}", kind, cause.getMessage());
+        service.add("_review_original_service", raw);
+        service.addProperty("type", "HTTP");
+        service.addProperty("template_url", raw.has("template_url") ? raw.get("template_url").getAsString()
+                : raw.has("get_feature_template_url") ? raw.get("get_feature_template_url").getAsString()
+                : raw.has("capabilities_url") ? raw.get("capabilities_url").getAsString() : "https://invalid.example.invalid");
+        service.addProperty("method", raw.has("method") ? raw.get("method").getAsString() : "GET");
+        service.addProperty("format", raw.has("format") ? raw.get("format").getAsString() : "application/octet-stream");
+        if (!service.has("parameters")) service.add("parameters", new JsonArray());
+    }
+
+    static String normalizeCapabilitiesUrl(String template, String serviceType) {
+        if (!"WMS".equals(serviceType) && !"WMTS".equals(serviceType)) {
+            throw new IllegalArgumentException("Unsupported capabilities service type: " + serviceType);
+        }
+        String cleaned = template.replaceAll("\\{[?&][^{}]*}", "");
+        int fragment = cleaned.indexOf('#');
+        if (fragment >= 0) cleaned = cleaned.substring(0, fragment);
+        int queryStart = cleaned.indexOf('?');
+        String base = queryStart < 0 ? cleaned : cleaned.substring(0, queryStart);
+        List<String> query = new ArrayList<>();
+        if (queryStart >= 0) {
+            for (String pair : cleaned.substring(queryStart + 1).split("&")) {
+                if (pair.isEmpty() || pair.contains("{") || pair.contains("}")) continue;
+                int equals = pair.indexOf('=');
+                String key = URLDecoder.decode(equals < 0 ? pair : pair.substring(0, equals), StandardCharsets.UTF_8);
+                if (key.equalsIgnoreCase("version") || !isOgcMapReservedParameter(key, "WMTS".equals(serviceType))) {
+                    query.add(pair);
+                } else {
+                    recordMigrationChange("capabilities_url_standard_parameters_removed",
+                            "Removed fixed WMS/WMTS request parameters managed by the lifecycle");
+                }
+            }
+        }
+        query.add("service=" + serviceType);
+        query.add("request=GetCapabilities");
+        String result = base + "?" + String.join("&", query);
+        URI uri = URI.create(result);
+        if (uri.getHost() == null || !("http".equals(uri.getScheme()) || "https".equals(uri.getScheme()))) {
+            throw new IllegalArgumentException("Capabilities URL must be an absolute HTTP(S) URL");
+        }
+        return result;
     }
 
     static void normalizeQueryPlaceholders(JsonObject service) {
@@ -496,11 +556,25 @@ public class MigrationExecution {
         }
     }
 
+    static void recordSourceCategory(LinkedEntity reference, Category category) {
+        JsonArray events = migrationDebug.get();
+        if (events == null) return;
+        JsonObject event = new JsonObject();
+        event.addProperty("action", "source_category");
+        if (reference != null) event.addProperty("source_id", reference.getInstanceId());
+        if (category != null) {
+            event.addProperty("name", category.getName());
+            if (category.getInScheme() != null) event.addProperty("scheme_id", category.getInScheme().getInstanceId());
+        }
+        events.add(event);
+    }
+
     private static List<String> categoryNames(List<LinkedEntity> refs) {
         List<String> out = new ArrayList<>();
         for (LinkedEntity le : safe(refs)) {
-            if (le == null || le.getInstanceId() == null) continue;
-            Category category = cast(CategoryAPI.retrieveAPI(EntityNames.CATEGORY.name()).retrieve(le.getInstanceId()), Category.class);
+            Category category = le == null || le.getInstanceId() == null ? null
+                    : cast(CategoryAPI.retrieveAPI(EntityNames.CATEGORY.name()).retrieve(le.getInstanceId()), Category.class);
+            recordSourceCategory(le, category);
             if (category != null && category.getName() != null) out.add(category.getName());
         }
         return out;
@@ -997,7 +1071,10 @@ public class MigrationExecution {
                     List<String> styles = styleMapping == null ? List.of("") : mappingChoices(styleMapping, "WMS styles");
                     String defaultStyle = styleMapping == null ? "" : mappingDefault(styleMapping, styles, "WMS styles");
                     if (layerNames.size() > 1 && styleMapping != null) {
-                        throw new IllegalArgumentException("Cannot associate WMS styles with multiple layers from a single mapping");
+                        styles = List.of("");
+                        defaultStyle = "";
+                        recordMigrationChange("styles_ambiguous_default", "WMS layer/style association is ambiguous; using provider default styles for manual review");
+                        log.warn("Using provider default styles for WMS distribution {} due to ambiguous layer/style mappings", rd.distribution.getInstanceId());
                     }
                     List<WMSDatasetExport.Layer> layers = new ArrayList<>();
                     for (String name : layerNames) {
@@ -1052,8 +1129,24 @@ public class MigrationExecution {
                 }
                 distributions.add(dd);
                 } catch (IllegalArgumentException e) {
-                    recordMigrationChange("distribution_removed", "WMS distribution " + rd.distribution.getInstanceId() + ": " + e.getMessage());
-                    log.warn("Skipping WMS distribution {}: {}", rd.distribution.getInstanceId(), e.getMessage());
+                    recordMigrationChange("distribution_incomplete", "WMS distribution retained for review " + rd.distribution.getInstanceId() + ": " + e.getMessage());
+                    log.warn("Retaining WMS distribution for review {}: {}", rd.distribution.getInstanceId(), e.getMessage());
+                    WMSDatasetExport.Distribution basic = new WMSDatasetExport.Distribution();
+                    basic.setType("WEB_SERVICE");
+                    basic.setTitle(first(rd.distribution.getTitle()));
+                    basic.setDescription(first(rd.distribution.getDescription()));
+                    basic.setLicense(rd.distribution.getLicence());
+                    basic.setByteSize(parseLong(str(rd.distribution.getByteSize())));
+                    WMSDatasetExport.WebService webService = new WMSDatasetExport.WebService();
+                    webService.setType("HTTP");
+                    webService.setTemplateUrl(templateBase(rd.operation));
+                    webService.setMethod(rd.operation.getMethod());
+                    webService.setFormat(migrationFormat(rd.distribution.getFormat()));
+                    webService.setContactPoints(rd.webServiceContactEmails);
+                    webService.setProvider(rd.providerName);
+                    webService.setDocumentationUri(rd.documentationUri);
+                    basic.setWebService(webService);
+                    distributions.add(basic);
                 }
             }
             metadata.setDistributions(distributions);
@@ -1129,11 +1222,14 @@ public class MigrationExecution {
                     List<String> layerNames = mappingChoices(layerMapping, "WMTS layers");
                     webService1.setDefaultLayer(mappingDefault(layerMapping, layerNames, "WMTS layers"));
                     Mapping styleMapping = findMapping(rd.mappings, "style");
-                    if (layerNames.size() > 1 && styleMapping != null) {
-                        throw new IllegalArgumentException("Cannot associate WMTS styles with multiple layers from a single mapping");
-                    }
                     List<String> styles = styleMapping == null ? null : mappingChoices(styleMapping, "WMTS styles");
                     String defaultStyle = styleMapping == null ? null : mappingDefault(styleMapping, styles, "WMTS styles");
+                    if (layerNames.size() > 1 && styleMapping != null) {
+                        styles = null;
+                        defaultStyle = null;
+                        recordMigrationChange("styles_ambiguous_default", "WMTS layer/style association is ambiguous; using provider default styles for manual review");
+                        log.warn("Using provider default styles for WMTS distribution {} due to ambiguous layer/style mappings", rd.distribution.getInstanceId());
+                    }
                     List<WMTSDatasetExport.Layer> layers = new ArrayList<>();
                     for (String name : layerNames) {
                         WMTSDatasetExport.Layer layer = new WMTSDatasetExport.Layer();
@@ -1184,8 +1280,24 @@ public class MigrationExecution {
                 }
                 distributions.add(dd);
                 } catch (IllegalArgumentException e) {
-                    recordMigrationChange("distribution_removed", "WMTS distribution " + rd.distribution.getInstanceId() + ": " + e.getMessage());
-                    log.warn("Skipping WMTS distribution {}: {}", rd.distribution.getInstanceId(), e.getMessage());
+                    recordMigrationChange("distribution_incomplete", "WMTS distribution retained for review " + rd.distribution.getInstanceId() + ": " + e.getMessage());
+                    log.warn("Retaining WMTS distribution for review {}: {}", rd.distribution.getInstanceId(), e.getMessage());
+                    WMTSDatasetExport.Distribution basic = new WMTSDatasetExport.Distribution();
+                    basic.setType("WEB_SERVICE");
+                    basic.setTitle(first(rd.distribution.getTitle()));
+                    basic.setDescription(first(rd.distribution.getDescription()));
+                    basic.setLicense(rd.distribution.getLicence());
+                    basic.setByteSize(parseLong(str(rd.distribution.getByteSize())));
+                    WMTSDatasetExport.WebService webService = new WMTSDatasetExport.WebService();
+                    webService.setType("HTTP");
+                    webService.setTemplateUrl(templateBase(rd.operation));
+                    webService.setMethod(rd.operation.getMethod());
+                    webService.setFormat(migrationFormat(rd.distribution.getFormat()));
+                    webService.setContactPoints(rd.webServiceContactEmails);
+                    webService.setProvider(rd.providerName);
+                    webService.setDocumentationUri(rd.documentationUri);
+                    basic.setWebService(webService);
+                    distributions.add(basic);
                 }
             }
             metadata.setDistributions(distributions);
@@ -1312,8 +1424,24 @@ public class MigrationExecution {
                 }
                 distributions.add(dd);
                 } catch (IllegalArgumentException e) {
-                    recordMigrationChange("distribution_removed", "WFS distribution " + rd.distribution.getInstanceId() + ": " + e.getMessage());
-                    log.warn("Skipping WFS distribution {}: {}", rd.distribution.getInstanceId(), e.getMessage());
+                    recordMigrationChange("distribution_incomplete", "WFS distribution retained for review " + rd.distribution.getInstanceId() + ": " + e.getMessage());
+                    log.warn("Retaining WFS distribution for review {}: {}", rd.distribution.getInstanceId(), e.getMessage());
+                    WFSDatasetExport.Distribution basic = new WFSDatasetExport.Distribution();
+                    basic.setType("WEB_SERVICE");
+                    basic.setTitle(first(rd.distribution.getTitle()));
+                    basic.setDescription(first(rd.distribution.getDescription()));
+                    basic.setLicense(rd.distribution.getLicence());
+                    basic.setByteSize(parseLong(str(rd.distribution.getByteSize())));
+                    WFSDatasetExport.WebService webService = new WFSDatasetExport.WebService();
+                    webService.setType("HTTP");
+                    webService.setTemplateUrl(templateBase(rd.operation));
+                    webService.setMethod(rd.operation.getMethod());
+                    webService.setFormat(migrationFormat(rd.distribution.getFormat()));
+                    webService.setContactPoints(rd.webServiceContactEmails);
+                    webService.setProvider(rd.providerName);
+                    webService.setDocumentationUri(rd.documentationUri);
+                    basic.setWebService(webService);
+                    distributions.add(basic);
                 }
             }
             metadata.setDistributions(distributions);
@@ -1341,9 +1469,8 @@ public class MigrationExecution {
         softwareApplicationExport.setResourceType("software-application");
 
         SoftwareApplicationExport.Metadata metadata = new SoftwareApplicationExport.Metadata();
-        // TODO: categories and creators are read from getContactPoint(): getCategory()
-        //       and the author/publisher field should probably be used instead.
-        metadata.setCategories(categoryNames(softwareApplication.getContactPoint()));
+        // TODO: creators should come from the relevant author/publisher field.
+        metadata.setCategories(categoryNames(softwareApplication.getCategory()));
         metadata.setContactPoints(contactPointEmails(softwareApplication.getContactPoint()));
         metadata.setCreators(organizationNames(softwareApplication.getContactPoint()));
         metadata.setDescription(descriptionOrName(softwareApplication.getDescription(), softwareApplication.getName()));
@@ -1386,8 +1513,8 @@ public class MigrationExecution {
         softwareSourceCodeExport.setResourceType("software-source-code");
 
         SoftwareSourceCodeExport.Metadata metadata = new SoftwareSourceCodeExport.Metadata();
-        // TODO: same as above, categories and creators are read from getContactPoint().
-        metadata.setCategories(categoryNames(softwareSourceCode.getContactPoint()));
+        // TODO: creators should come from the relevant author/publisher field.
+        metadata.setCategories(categoryNames(softwareSourceCode.getCategory()));
         metadata.setContactPoints(contactPointEmails(softwareSourceCode.getContactPoint()));
         metadata.setCreators(organizationNames(softwareSourceCode.getContactPoint()));
         metadata.setDescription(descriptionOrName(softwareSourceCode.getDescription(), softwareSourceCode.getName()));

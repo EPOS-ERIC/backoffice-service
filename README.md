@@ -10,8 +10,11 @@ omitted distributions. An invalid export returns HTTP 500 with `payload: null` a
 the error and events in `debug`. The list endpoint retains its array response.
 
 When a WMS, WMTS, or WFS distribution cannot be converted from the available
-metadata, the exporter omits that distribution and records the reason. A draft can
-therefore be created with no distributions; review debug events before publishing.
+metadata, the exporter retains it for manual completion with a generic HTTP
+configuration when possible, and records the reason. The preliminary payload may
+use `_review_original_service` to preserve the original geographic configuration;
+this object is review metadata and must not be used as a final WMS/WMTS/WFS
+configuration. Review all such debug events before publishing.
 
 ## Concept
 We want to improve how the TCSs manage and edit the metadata they produced for the EPOS data portal. At the moment they are used to put all the metadata into the ttl file which are after ingest into the system throught the ingestor-service. They need to operate on these data in a more flexible way. 
